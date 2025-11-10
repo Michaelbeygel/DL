@@ -20,13 +20,19 @@ class FirstLastSampler(Sampler):
         self.data_source = data_source
 
     def __iter__(self) -> Iterator[int]:
-        # TODO:
+        # TODO: \\ Done
         # Implement the logic required for this sampler.
         # If the length of the data source is N, you should return indices in a
         # first-last ordering, i.e. [0, N-1, 1, N-2, ...].
-        # ====== YOUR CODE: ======
-        raise NotImplementedError()
-        # ========================
+        # iterate only over the first half; each iteration yields 1–2 elements
+        n = len(self)
+        half = (n + 1) // 2           # number of iterations
+
+        for i in range(half):
+            yield i                   # front index
+            j = n - 1 - i             # back index
+            if j != i:
+                yield j
 
     def __len__(self):
         return len(self.data_source)
@@ -48,7 +54,7 @@ def create_train_validation_loaders(
     if not (0.0 < validation_ratio < 1.0):
         raise ValueError(validation_ratio)
 
-    # TODO:
+    # TODO: \\ Done
     #  Create two DataLoader instances, dl_train and dl_valid.
     #  They should together represent a train/validation split of the given
     #  dataset. Make sure that:
@@ -57,8 +63,25 @@ def create_train_validation_loaders(
     #     from the dataset.
     #  Hint: you can specify a Sampler class for the `DataLoader` instance
     #  you create.
-    # ====== YOUR CODE: ======
-    raise NotImplementedError()
-    # ========================
+
+    n = len(dataset)
+    n_valid = int(validation_ratio * n)
+
+    # random, non-overlapping split
+    indices = torch.randperm(n).tolist()
+    valid_indices = indices[:n_valid]
+    train_indices = indices[n_valid:]
+
+    dl_train = torch.utils.data.DataLoader(
+        dataset,
+        batch_size=batch_size,
+        sampler=torch.utils.data.SubsetRandomSampler(train_indices),
+    )
+
+    dl_valid = torch.utils.data.DataLoader(
+        dataset,
+        batch_size=batch_size,
+        sampler=torch.utils.data.SubsetRandomSampler(valid_indices),
+    )
 
     return dl_train, dl_valid
