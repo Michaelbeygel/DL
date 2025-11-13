@@ -162,9 +162,16 @@ def top_correlated_features(df: DataFrame, target_feature, n=5):
 
     # TODO: Calculate correlations with target and sort features by it
 
-    # ====== YOUR CODE: ======
-    raise NotImplementedError()
-    # ========================
+    # Calculates correlation matrix
+    correlation_df = df.corr(method="pearson")
+
+    # Choose the column for the target_feature, get the absolute values, sort it,
+    # then get the top n elements(excluding the first element, which is the correlation of
+    # the target_feature with itself)
+    top_n_corr = correlation_df[target_feature].abs().sort_values(ascending=False)[1:n+1]
+
+    # Return the names of the top indices
+    top_n_features = top_n_corr.index.tolist()
 
     return top_n_features, top_n_corr
 
