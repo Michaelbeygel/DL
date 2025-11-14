@@ -98,10 +98,11 @@ class BiasTrickTransformer(BaseEstimator, TransformerMixin):
         #  Add bias term to X as the first feature.
         #  See np.hstack().
 
-        xb = None
-        # ====== YOUR CODE: ======
-        raise NotImplementedError()
-        # ========================
+        # Create a ndarray bias column
+        bias_column = np.full((X.shape[0],1),1)
+
+        # Concat the two ndarrays
+        xb = np.hstack((bias_column,X))
 
         return xb
 
@@ -185,9 +186,9 @@ def mse_score(y: np.ndarray, y_pred: np.ndarray):
     """
 
     # TODO: Implement MSE using numpy.
-    # ====== YOUR CODE: ======
-    raise NotImplementedError()
-    # ========================
+
+    mse = ((y_pred-y)**2).mean(axis=0)
+
     return mse
 
 
@@ -200,9 +201,13 @@ def r2_score(y: np.ndarray, y_pred: np.ndarray):
     """
 
     # TODO: Implement R^2 using numpy.
-    # ====== YOUR CODE: ======
-    raise NotImplementedError()
-    # ========================
+
+    prediction_residuals_squared_sum = ((y-y_pred)**2).sum()
+
+    avarage_residuals_squared_sum = ((y-y.mean(axis=0))**2).sum()
+
+    r2 = 1 - (prediction_residuals_squared_sum/avarage_residuals_squared_sum)
+
     return r2
 
 
