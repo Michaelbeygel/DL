@@ -7,6 +7,7 @@ from sklearn.utils import check_array
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.utils.validation import check_X_y, check_is_fitted
+from sklearn.model_selection import GridSearchCV
 
 
 class LinearRegressor(BaseEstimator, RegressorMixin):
@@ -89,9 +90,14 @@ def fit_predict_dataframe(
     :return: A vector of predictions, y_pred.
     """
     # TODO: Implement according to the docstring description.
-    # ====== YOUR CODE: ======
-    raise NotImplementedError()
-    # ========================
+    
+    # If the list is empty, take the whole dataset
+    if feature_names is None:
+        part_of_df = df.drop(columns=[target_name])
+    else:
+        part_of_df = df[feature_names]
+
+    y_pred = model.fit_predict(part_of_df, df[target_name])
     return y_pred
 
 
@@ -130,9 +136,9 @@ class BostonFeaturesTransformer(BaseEstimator, TransformerMixin):
 
         # TODO: Your custom initialization, if needed
         # Add any hyperparameters you need and save them as above
-        # ====== YOUR CODE: ======
-        raise NotImplementedError()
-        # ========================
+
+        # Added polynomial transformer feature
+        self.poly_transform = PolynomialFeatures(self.degree)
 
     def fit(self, X, y=None):
         return self
@@ -151,10 +157,20 @@ class BostonFeaturesTransformer(BaseEstimator, TransformerMixin):
         #  (this class is "Boston-specific"). For example X[:,1] is the second
         #  feature ('ZN').
 
-        X_transformed = None
-        # ====== YOUR CODE: ======
-        raise NotImplementedError()
-        # ========================
+        # Copy the dataframe. Make sure the datatype is float for the log operations
+        X_transformed = X.copy().astype(float)
+        # Apply log function to CRIM, and then to LSTAT
+        CRIM_index = 0
+        LSTAT_index = 12
+        X_transformed[:,CRIM_index] = np.log1p(X_transformed[:,CRIM_index])
+        X_transformed[:,LSTAT_index] = np.log1p(X_transformed[:,LSTAT_index])
+        # Remove CHAS feature
+        CHAS_index = 3
+        X_transformed = np.delete(X_transformed, CHAS_index, 1)
+
+        # Increase the model capacity by adding parameters
+        
+        X_transformed = self.poly_transform.fit_transform(X_transformed)
 
         return X_transformed
 
@@ -219,6 +235,10 @@ def r2_score(y: np.ndarray, y_pred: np.ndarray):
 
     average_residuals_squared_sum = ((y-y.mean(axis=0))**2).sum()
 
+    # Check edge case of division by 0
+    if average_residuals_squared_sum == 0:
+        return 0.0
+
     r2 = 1 - (prediction_residuals_squared_sum/average_residuals_squared_sum)
 
     return r2
@@ -251,8 +271,13 @@ def cv_best_hyperparams(
     #    names as keys.
     #  - You can use MSE or R^2 as a score.
 
-    # ====== YOUR CODE: ======
-    raise NotImplementedError()
-    # ========================
+    param_grid = [{
+        'bostonfeaturestransformer__degree': degree_range, 
+        'linearregressor__reg_lambda': lambda_range
+    }]
 
+    grid_search = GridSearchCV(model, param_grid, cv=k_folds, scoring='neg_mean_squared_error')
+    grid_search.fit(X,y)
+
+    best_params = grid_search.best_params_
     return best_params
