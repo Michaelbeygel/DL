@@ -56,9 +56,11 @@ class BiasTrick(object):
         """
         assert x.dim() > 0, "Scalars not supported"
 
-        # TODO:
+        # TODO: \\ Done
         #  Add a 1 at the beginning of the given tensor's feature dimension.
         #  Hint: See torch.cat().
-        # ====== YOUR CODE: ======
-        raise NotImplementedError()
-        # ========================
+        # Create a tensor of ones whose shape matches x except last dim = 1
+        ones = torch.ones(*x.shape[:-1], 1, dtype=x.dtype)
+
+        # Concatenate along the last dimension
+        return torch.cat((ones, x), dim=-1)
