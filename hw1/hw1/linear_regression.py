@@ -30,11 +30,8 @@ class LinearRegressor(BaseEstimator, RegressorMixin):
 
         # TODO: Calculate the model prediction, y_pred
 
-        y_pred = None
-        # ====== YOUR CODE: ======
-        raise NotImplementedError()
-        # ========================
-
+        y_pred = X @ self.weights_
+        
         return y_pred
 
     def fit(self, X, y):
@@ -50,9 +47,25 @@ class LinearRegressor(BaseEstimator, RegressorMixin):
         #  Use only numpy functions. Don't forget regularization!
 
         w_opt = None
-        # ====== YOUR CODE: ======
-        raise NotImplementedError()
-        # ========================
+
+        # We will assume the bias trick already applied(as happeneds in the pipeline)
+        # Then the loss function is: 1/2N * |Xw-y|^2 + lambda/2 * |w|^2
+        # The closed solution is therefore:
+        # (X^T * X + I * N * lambda) * w = X^T * y
+        # we will let numpy solve this for us, to ensure numerical stability
+
+        N, D = X.shape
+
+        # In order to avoid regularization of the bias that is embedded in the w vector from the bias trick,
+        # we will change the identity matrix so that it will not include the weights that are responsible for b.
+        # In this case, these weights are at the first indices.
+        modified_identity_matrix = np.eye(D)
+        modified_identity_matrix[0,0] = 0
+
+        A = X.T @ X + modified_identity_matrix*N*self.reg_lambda
+        B = X.T @ y
+        # Solve for Aw=B  <->  (X^T * X + I * N * lambda) * w = X^T * y
+        w_opt = np.linalg.solve(A, B)
 
         self.weights_ = w_opt
         return self
@@ -187,7 +200,7 @@ def mse_score(y: np.ndarray, y_pred: np.ndarray):
 
     # TODO: Implement MSE using numpy.
 
-    mse = ((y_pred-y)**2).mean(axis=0)
+    mse = ((y-y_pred)**2).mean(axis=0)
 
     return mse
 
@@ -204,9 +217,9 @@ def r2_score(y: np.ndarray, y_pred: np.ndarray):
 
     prediction_residuals_squared_sum = ((y-y_pred)**2).sum()
 
-    avarage_residuals_squared_sum = ((y-y.mean(axis=0))**2).sum()
+    average_residuals_squared_sum = ((y-y.mean(axis=0))**2).sum()
 
-    r2 = 1 - (prediction_residuals_squared_sum/avarage_residuals_squared_sum)
+    r2 = 1 - (prediction_residuals_squared_sum/average_residuals_squared_sum)
 
     return r2
 
