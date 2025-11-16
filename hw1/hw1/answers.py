@@ -132,8 +132,49 @@ So, people might say, it is not a hyperplane because of that. But because we are
 part3_q3 = r"""
 **Your answer:**
 
-1. Let's calculate the expected value $\mathbb{E}_{x,y}[|y-x|]$.
-First, $x$ and $y$, both $\sim \text{Uniform}(0,1)$ and therfore $1=f_x(x)=f_y(y)=f_{x,y}(x,y)$
+1. The expected value is $\mathbb{E}_{x,y}[|y-x|] = \frac{1}{3}$.
+
+First, $x$ and $y$ both $\sim \text{Uniform}(0,1)$ and therefore $1=f_x(x)=f_y(y)=f_{x,y}(x,y)$.
+
+Hence, 
+
+$\mathbb{E}_{x,y}[|y-x|] = \int_{0}^1\int_{0}^{1}f_{x,y}(x,y)|x-y|\,dx\,dy = \int_{0}^1\int_{0}^{1}|x-y|\,dx\,dy =
+\int_{0}^1(\int_{0}^{y}|x-y|\,dx + (\int_{y}^{1}|x-y|\,dx))\,dy =
+\int_{0}^1(\int_{0}^{y}(y-x)\,dx + (\int_{y}^{1}(x-y)\,dx))\,dy =
+\int_{0}^1(\bigg[\, yx - \frac{1}{2}x^2 \,\bigg]_{0}^{y} + \bigg[\, \frac{1}{2}x^2 - yx \,\bigg]_{0}^{y})\,dy =
+\int_{0}^1((y^2-\frac{1}{2})+(\frac{1}{2} - y - \frac{1}{2}y^2 + y^2))\,dy = 
+\int_{0}^1(\frac{1}{2}-y+y^2)\,dy = 
+\bigg[\, \frac{1}{2}y - \frac{1}{2}y^2 + \frac{1}{3}y^3 \,\bigg]_{0}^{1} =
+\frac{1}{3}
+$
+
+
+
+2. The expected value is $\mathbb{E}_{x}[|\hat{x}-x|] = \frac{1}{2} - \hat{x} + \hat{x}^2$.
+
+First, as in section 1, $f_{x}(x)=1$.
+
+Second, we will treat $\hat{x}$ as a known value.
+
+Therefore:
+
+$\mathbb{E}_{x}[|\hat{x}-x|] =
+\int_{0}^{1}f_{x}(x)|\hat{x}-x|\,dx = 
+\int_{0}^{1}1\cdot|\hat{x}-x|\,dx = 
+\int_{0}^{\hat{x}}(\hat{x}-x)\,dx + \int_{\hat{x}}^{1}(x-\hat{x})\,dx =
+\bigg[\, \hat{x}x - \frac{1}{2}x^2 \,\bigg]_{0}^{\hat{x}} + \bigg[\, \frac{1}{2}x^2 - \hat{x}x \,\bigg]_{\hat{x}}^{1} =
+\hat{x}^2 - \frac{1}{2}\hat{x}^2 + \frac{1}{2} - \hat{x} - \frac{1}{2}\hat{x}^2 + \hat{x}^2 = 
+\frac{1}{2} - \hat{x} + \hat{x}^2
+$
+
+3. Dropping the scalar value of the polynomial will not give the correct expected value.
+
+**But**, beacuse we will be using this expected value as a part of a loss function, this value will not be relevant anymore.
+After removing the scalar value off the polynomial, the minimizing operation will be the same. 
+That is because adding\\multiplying a function by a scalar keeps the max and min points.
+
+Moreover, this will simplify our function. 
+Therefore we would like to use this "trick" for easier calculations. 
 
 """
 
