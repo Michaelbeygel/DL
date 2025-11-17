@@ -85,7 +85,6 @@ class LinearClassifier(object):
 
         print("Training", end="")
         for epoch_idx in range(max_epochs):
-            total_correct = 0
             average_loss = 0
             train_num_batches = 0
             for x, y in dl_train:
@@ -96,36 +95,32 @@ class LinearClassifier(object):
 
                 # ---- Train stats ----
                 average_loss += loss.item()                     # sum of batch mean losses
-                total_correct += (y_pred == y).sum().item()     # count correct samples
                 train_num_batches += 1
 
             # ---- Epoch train metrics ----
             average_loss /= train_num_batches
-            train_accuracy = total_correct / len(dl_train.dataset)
+            train_accuracy = self.evaluate_accuracy(y, y_pred).item()
 
             train_res.loss.append(average_loss)
             train_res.accuracy.append(train_accuracy)
 
             # ===== VALIDATION PHASE =====
-            val_total_correct = 0
-            val_total_loss = 0
+            val_average_loss = 0
             val_num_batches = 0
 
             for x_val, y_val in dl_valid:
                 y_pred_val, x_scores_val = self.predict(x_val)
-                loss_val = loss_fn(x_val, y_val, x_scores_val, y_pred_val) \
-                           + 0.5 * weight_decay * torch.sum(self.weights * self.weights)
+                loss_val = loss_fn(x_val, y_val, x_scores_val, y_pred_val) + 0.5 * weight_decay * torch.sum(self.weights * self.weights)
 
                 # ---- Val stats ----
-                val_total_loss += loss_val.item()
-                val_total_correct += (y_pred_val == y_val).sum().item()
+                val_average_loss += loss_val.item()
                 val_num_batches += 1
 
-            # ---- Epoch train metrics ----
-            avg_val_loss = val_total_loss / val_num_batches
-            val_accuracy = val_total_correct / len(dl_valid.dataset)
+            # ---- Epoch validation metrics ----
+            val_average_loss /= val_num_batches
+            val_accuracy = self.evaluate_accuracy(y_val, y_pred_val).item()
 
-            valid_res.loss.append(avg_val_loss)
+            valid_res.loss.append(val_average_loss)
             valid_res.accuracy.append(val_accuracy)
             # TODO:
             #  Implement model training loop.
@@ -177,7 +172,7 @@ class LinearClassifier(object):
 
 
 def hyperparams():
-    hp = dict(weight_std=0.1, learn_rate=0.06, weight_decay=0.01)
+    hp = dict(weight_std=0.01, learn_rate=0.01, weight_decay=0.01)
 
     # TODO:
     #  Manually tune the hyperparameters to get the training accuracy test
