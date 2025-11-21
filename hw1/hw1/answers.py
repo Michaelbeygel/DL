@@ -92,6 +92,7 @@ In all of the plots we can see that the majority of the dots are around the 0 ho
 In the plot for the top-5 features, the dots are scattered widely around the 0 line. 
 Also, we can see that there are many outliers which have inaccurate predictions.
 In comparison, the final plot after CV, is much more compact around the 0 line, and has fewer outliers.
+This is because after adding non-linear features and hyperparameters tuning the model is much more accurate.
 So, from the above observations we can conclude that the final model is quite fit, and is fitter than the beginning model.
 
 """
@@ -101,16 +102,15 @@ part3_q2 = r"""
 
 We will explain the effect of adding non-linear features to our data, based of the given points:
 
-1. **YES** , the model is still a linear regression model. Altough the model might not be linear in the variables, it is linear in the parameters. 
-That means that it will find a linear combination in the new vector space.
+1. **YES** , the model is always a linear regression model.
+Altough the model might fit non-linear data in the original vector space, he will always be linear.
 We can look at it this way: by adding non-linear features to our data we will get new dimentions to the vector space where data lays. 
-The added indices will be a skewed version of the original indices. 
+The added indices will be a function of the original indices. 
 In the new vector space, the regression will be linear and we will get a linear hyperplane.
 
 The reason why it might not be a linear regression, is that we are using a non linear combinations of the data. 
 Therefore we might get non linear hyperplanes, if we look at it from the perspective of the original vector space. 
 As we said before, these hyperplanes will be linear in the new vector space. 
-
 
 2. Theoretically, we **CAN** fit any non-linear function of the original features with this approach.
 If we know the function of the original features, then we can add one index with the value of the function.
