@@ -9,71 +9,92 @@ math (delimited with $$).
 # Part 1 answers
 
 part1_q1 = r"""
-**Your answer:**
+1. False.  
+A split of the data into two disjoint subsets does not always constitute a useful train–test split.  
+For example, in a cat–dog classification task, if all dog images are placed in the training set and all cat images in the test set, the model will only learn what dogs look like and will fail on cats.  
+If the training set is not representative of the full distribution, the evaluation is misleading and the split is not useful.
 
+2. False.  
+The test set must not be used during cross-validation. CV is performed only on the training data for tuning hyperparameters.  
+Using the test set during CV leaks information into training, causing overfitting to the test set and producing a biased, unreliable evaluation.
 
-Write your answer using **markdown** and $\LaTeX$:
-```python
-# A code block
-a = 2
-```
-An equation: $e^{i\pi} -1 = 0$
+3. True.  
+In each fold of cross-validation, the model is trained on part of the data and evaluated on a held-out fold, simulating unseen data.  
+Since every sample is used as validation exactly once, the average performance across folds provides a reliable estimate of generalization.
+
+4. False.  
+Injecting noise into the labels does not test robustness—it corrupts the ground truth and only checks whether the model can memorize wrong targets.  
+Adding noise to the input data itself preserves the labels and *does* test robustness by checking whether the model handles realistic variations without failing.
 
 """
 
 part1_q2 = r"""
-**Your answer:**
-
-
-Write your answer using **markdown** and $\LaTeX$:
-```python
-# A code block
-a = 2
-```
-An equation: $e^{i\pi} -1 = 0$
-
+No, your friend's approach is not justified.
+The test set should be used only once for the final, unbiased evaluation of the model, and must not take part in the hyperparameter selection process.
+By training models with different values of $\lambda$ and choosing the one that performs best on the test set, information from the test set leaks into the training procedure, causing the model to overfit to the test set and producing an overly optimistic estimate of performance.
+The correct procedure is to tune $\lambda$ using a validation set (or cross-validation) created from the training data, and only after selecting the best $\lambda$ should the final evaluation be performed on the test set.
 """
 
 # ==============
 # Part 2 answers
 
 part2_q1 = r"""
-**Your answer:**
+If we allow $\Delta < 0$, the SVM loss becomes meaningless.  
+A negative margin allows bad predictions to avoid being penalized, because the hinge term can become negative and then is clipped to zero.
 
+For example, consider the sample $s_i = (x_i, y_i)$ and take:
+$w_j^T x_i = 0.5$, $w_{y_i}^T x_i = 0.4$, and $\Delta = -0.2$.
 
-Write your answer using **markdown** and $\LaTeX$:
-```python
-# A code block
-a = 2
-```
-An equation: $e^{i\pi} -1 = 0$
+Then the margin term is:
+$
+\Delta + w_j^T x_i - w_{y_i}^T x_i
+= -0.2 + 0.5 - 0.4
+= -0.1 < 0.
+$
 
+Therefore,
+
+$\max(0,\,-0.1) = 0.$
+
+so the model receives **no loss even though the wrong class has a higher score than the correct class**.
+
+Thus, $\Delta < 0$ breaks the meaning of the SVM loss and encourages incorrect behavior.
 """
 
 part2_q2 = r"""
-**Your answer:**
+Based on the weight visualization, we see that the linear model is essentially learning a template for each digit. 
+Since the model is linear, each class score is just a dot-product $w_j^T x_i$, meaning it compares the input image 
+with the learned weight image for that class. Large positive weights highlight pixels that support the class, 
+while negative weights penalize pixels that contradict the template. For example, the weight map for the digit “0” 
+shows a bright circular outline, indicating that images with an oval shape in the center produce a high score for class 0.
 
+Because the model is linear, it cannot capture complex shapes or spatial relationships; it can only look for 
+global correlations between pixel intensities and the weight template. This explains many of the classification 
+errors. Digits that share similar overall pixel patterns-such as 4 vs 9, 7 vs 1, or 5 vs 6-produce similar 
+dot-products with the weight vectors, causing confusion. If a digit is written in an unusual style or slightly 
+distorted, its pixel pattern may resemble the wrong class template more than the correct one, leading to mistakes.
 
-Write your answer using **markdown** and $\LaTeX$:
-```python
-# A code block
-a = 2
-```
-An equation: $e^{i\pi} -1 = 0$
-
+In summary, the model behaves like a template matcher: it multiplies the image with each class weight image and 
+chooses the template with the highest similarity. Therefore, errors occur mainly when two digits have similar 
+global shapes or when the handwriting does not match the learned template well.
 """
 
 part2_q3 = r"""
-**Your answer:**
+1.
+The learning rate we chose appears to be **good**.
+The training loss decreases smoothly over time, **without sudden spikes**, and it **converges nicely** toward a minimum. This indicates that the step sizes taken during gradient descent are appropriate.
+
+If the learning rate were too small, the updates would make only tiny progress each step, so within the same number of epochs the loss would decrease very slowly and might not converge to a good minimum.
+
+If the learning rate were too large, each update would make big jumps in parameter space, causing the loss to change dramatically, bounce around, or even diverge. The plot would show large oscillations or increases in loss instead of a smooth downward trend.
 
 
-Write your answer using **markdown** and $\LaTeX$:
-```python
-# A code block
-a = 2
-```
-An equation: $e^{i\pi} -1 = 0$
+2.
+The model is **slightly overfitted** to the training set.
+During the epochs, the training accuracy is consistently higher than the validation accuracy, but the gap between them is relatively small.
+This indicates that the model is slightly overfitted: it has learned patterns that fit the training data better than the unseen validation data, but the difference is small enough to show that it still generalizes reasonably well.
 
+The fact that the training accuracy is higher is normal, but overfitting happens when the gap becomes large
 """
 
 # ==============
