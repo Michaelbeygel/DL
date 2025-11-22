@@ -29,7 +29,7 @@ Adding noise to the input data itself preserves the labels and *does* test robus
 """
 
 part1_q2 = r"""
-No, your friend's approach is not justified.
+No, the friend's approach is not justified.
 The test set should be used only once for the final, unbiased evaluation of the model, and must not take part in the hyperparameter selection process.
 By training models with different values of $\lambda$ and choosing the one that performs best on the test set, information from the test set leaks into the training procedure, causing the model to overfit to the test set and producing an overly optimistic estimate of performance.
 The correct procedure is to tune $\lambda$ using a validation set (or cross-validation) created from the training data, and only after selecting the best $\lambda$ should the final evaluation be performed on the test set.
