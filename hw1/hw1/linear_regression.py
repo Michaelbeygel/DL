@@ -141,6 +141,9 @@ class BostonFeaturesTransformer(BaseEstimator, TransformerMixin):
         self.poly_transform = PolynomialFeatures(self.degree)
 
     def fit(self, X, y=None):
+        CHAS_index = 3
+        X_transformed = np.delete(X, CHAS_index, 1)
+        self.poly_transform.fit(X_transformed)
         return self
 
     def transform(self, X):
@@ -169,8 +172,7 @@ class BostonFeaturesTransformer(BaseEstimator, TransformerMixin):
         X_transformed = np.delete(X_transformed, CHAS_index, 1)
 
         # Increase the model capacity by adding parameters
-        
-        X_transformed = self.poly_transform.fit_transform(X_transformed)
+        X_transformed = self.poly_transform.transform(X_transformed)
 
         return X_transformed
 
@@ -276,7 +278,7 @@ def cv_best_hyperparams(
         'linearregressor__reg_lambda': lambda_range
     }]
 
-    grid_search = GridSearchCV(model, param_grid, cv=k_folds, scoring='neg_mean_squared_error')
+    grid_search = GridSearchCV(model, param_grid, cv=k_folds, scoring='r2')
     grid_search.fit(X,y)
 
     best_params = grid_search.best_params_
