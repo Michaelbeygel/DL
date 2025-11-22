@@ -10,8 +10,8 @@ math (delimited with $$).
 
 part1_q1 = r"""
 1. False.  
-A split of the data into two disjoint subsets does not always constitute a useful train–test split.  
-For example, in a cat–dog classification task, if all dog images are placed in the training set and all cat images in the test set, the model will only learn what dogs look like and will fail on cats.  
+A split of the data into two disjoint subsets does not always constitute a useful train\\test split.  
+For example, in a cat\\dog classification task, if all dog images are placed in the training set and all cat images in the test set, the model will only learn what dogs look like and will fail on cats.  
 If the training set is not representative of the full distribution, the evaluation is misleading and the split is not useful.
 
 2. False.  
@@ -23,8 +23,10 @@ In each fold of cross-validation, the model is trained on part of the data and e
 Since every sample is used as validation exactly once, the average performance across folds provides a reliable estimate of generalization.
 
 4. False.  
-Injecting noise into the labels does not test robustness—it corrupts the ground truth and only checks whether the model can memorize wrong targets.  
+Injecting noise into the labels does not test robustness, it corrupts the ground truth and only checks whether the model can memorize wrong targets.  
 Adding noise to the input data itself preserves the labels and *does* test robustness by checking whether the model handles realistic variations without failing.
+
+
 
 """
 
