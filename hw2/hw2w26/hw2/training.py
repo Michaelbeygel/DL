@@ -299,7 +299,19 @@ class LayerTrainer(Trainer):
         #  - Calculate number of correct predictions (make sure it's an int,
         #    not a tensor) as num_correct.
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        
+        # - Forward pass
+        predictions = self.model(X) # Computes forward pass implicitly.
+        # Calculate loss function on the predictions.
+        loss = self.loss_fn(predictions, y)
+        # - Backward pass
+        loss.backward()
+
+        self.optimiser.step()
+        self.optimiser.zero_grad()
+
+        num_correct = (predictions.argmax(dim=1) == y).sum().item()
+
         # ========================
 
         return BatchResult(loss, num_correct)
