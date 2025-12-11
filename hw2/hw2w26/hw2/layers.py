@@ -324,9 +324,6 @@ class CrossEntropyLoss(Layer):
         N = x.shape[0]
         D = x.shape[1]
 
-        # TODO: Calculate the gradient w.r.t. the input x.
-        # ====== YOUR CODE: ======
-        
         # 1. Calculate Softmax output (predicted probabilities, y_hat)
         # We use the shifted scores x saved from the forward pass
         exp_x = torch.exp(x)
@@ -399,7 +396,7 @@ class Sequential(Layer):
         pre_layer_out = x
 
         for layer in self.layers:
-            out = layer(pre_layer_out)
+            out = layer(pre_layer_out, **kw)
             pre_layer_out = out
 
         return out
@@ -482,10 +479,39 @@ class MLP(Layer):
         """
         layers = []
 
-        # TODO: Build the MLP architecture as described.
-        # ====== YOUR CODE: ======
-        raise NotImplementedError()
-        # ========================
+        # 1. Select the Activation Layer Class
+        if activation == "relu":
+            activation_cls = ReLU
+        elif activation == "sigmoid":
+            activation_cls = Sigmoid
+        else:
+            raise ValueError(f"Unsupported activation: {activation}")
+
+        # Determine the full list of feature dimensions: [D, h1, h2, ..., hL, C]
+        feature_dims = [in_features] + list(hidden_features) + [num_classes]
+
+        # 2. Build the MLP sequence layer by layer
+        # The loop iterates through the connections: (D, h1), (h1, h2), ..., (hL, C)
+        
+        # We stop at len(feature_dims) - 1 because we are looking at pairs (i, i+1)
+        for i in range(len(feature_dims) - 1):
+            dim_in = feature_dims[i]
+            dim_out = feature_dims[i+1]
+            
+            # 2a. Add the Linear (FC) Layer
+            # FC(Dim_in, Dim_out)
+            layers.append(Linear(dim_in, dim_out, **kw))
+
+            # 2b. Add Activation and Dropout (ONLY for hidden layers)
+            # We skip adding activation/dropout after the very last Linear layer 
+            # (which has num_classes output features)
+            if i < len(feature_dims) - 2: 
+                # Add the Activation Layer
+                layers.append(activation_cls())
+                
+                # Add Dropout if p > 0
+                if dropout > 0:
+                    layers.append(Dropout(p=dropout))
 
         self.sequence = Sequential(*layers)
 
