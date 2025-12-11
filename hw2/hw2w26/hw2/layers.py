@@ -80,11 +80,8 @@ class LeakyReLU(Layer):
         :return: ReLU of each sample in x.
         """
 
-        # TODO: Implement the LeakyReLU operation.
-        # ====== YOUR CODE: ======
-        raise NotImplementedError()
-        # ========================
-
+        out = torch.where(x>0, x, self.alpha * x)
+        
         self.grad_cache["x"] = x
         return out
 
@@ -94,12 +91,11 @@ class LeakyReLU(Layer):
         :return: Gradient with respect to layer input, shape (N, *)
         """
         x = self.grad_cache["x"]
-
-        # TODO: Implement gradient w.r.t. the input x
-        # ====== YOUR CODE: ======
-        raise NotImplementedError()
-        # ========================
-
+        
+        local_grad = torch.where(x>0, 1.0, self.alpha)
+        
+        dx = dout * local_grad
+        
         return dx
 
     def params(self):
@@ -115,9 +111,7 @@ class ReLU(LeakyReLU):
     """
 
     def __init__(self):
-        # ====== YOUR CODE: ======
-        raise NotImplementedError()
-        # ========================
+        super().__init__(alpha=0.0)
 
     def __repr__(self):
         return "ReLU"
@@ -139,11 +133,8 @@ class Sigmoid(Layer):
         :return: Sigmoid of each sample in x.
         """
 
-        # TODO: Implement the Sigmoid function.
-        #  Save whatever you need into grad_cache.
-        # ====== YOUR CODE: ======
-        raise NotImplementedError()
-        # ========================
+        out = 1.0 / (1.0 + torch.exp(-x))
+        self.grad_cache["out"] = out
 
         return out
 
@@ -152,11 +143,9 @@ class Sigmoid(Layer):
         :param dout: Gradient with respect to layer output, shape (N, *).
         :return: Gradient with respect to layer input, shape (N, *)
         """
-
-        # TODO: Implement gradient w.r.t. the input x
-        # ====== YOUR CODE: ======
-        raise NotImplementedError()
-        # ========================
+        s_x = self.grad_cache["out"]
+        local_grad = s_x * (1.0 - s_x)
+        dx = dout * local_grad
 
         return dx
 
@@ -179,12 +168,8 @@ class TanH(Layer):
         dimension, and * is any number of other dimensions.
         :return: Sigmoid of each sample in x.
         """
-
-        # TODO: Implement the tanh function.
-        #  Save whatever you need into grad_cache.
-        # ====== YOUR CODE: ======
-        raise NotImplementedError()
-        # ========================
+        out = (torch.exp(x) - torch.exp(-x)) / (torch.exp(x) + torch.exp(-x))
+        self.grad_cache["out"] = out
 
         return out
 
@@ -193,11 +178,14 @@ class TanH(Layer):
         :param dout: Gradient with respect to layer output, shape (N, *).
         :return: Gradient with respect to layer input, shape (N, *)
         """
-
-        # TODO: Implement gradient w.r.t. the input x
-        # ====== YOUR CODE: ======
-        raise NotImplementedError()
-        # ========================
+        
+        tanh = self.grad_cache["out"]
+        
+        # 1. Calculate the local gradient: d(tanh(x))/dx = 1 - tanh^2(x) = 1 - y^2
+        local_grad = 1.0 - tanh*tanh
+        
+        # 2. Apply the chain rule: dx = dout * local_grad
+        dx = dout * local_grad
 
         return dx
 
@@ -220,12 +208,8 @@ class Linear(Layer):
         self.in_features = in_features
         self.out_features = out_features
 
-        # TODO: Create the weight matrix (self.w) and bias vector (self.b).
-        # Initialize the weights to zero-mean gaussian noise with a standard
-        # deviation of `wstd`. Init bias to zero.
-        # ====== YOUR CODE: ======
-        raise NotImplementedError()
-        # ========================
+        self.w = torch.normal(mean=0.0, std=wstd, size=(out_features, in_features)).float()
+        self.b = torch.zeros(out_features).float()
 
         # These will store the gradients
         self.dw = torch.zeros_like(self.w)
@@ -242,10 +226,7 @@ class Linear(Layer):
         :return: Affine transform of each sample in x.
         """
 
-        # TODO: Compute the affine transform
-        # ====== YOUR CODE: ======
-        raise NotImplementedError()
-        # ========================
+        out = x @ self.w.t() + self.b
 
         self.grad_cache["x"] = x
         return out
@@ -257,14 +238,23 @@ class Linear(Layer):
         """
         x = self.grad_cache["x"]
 
-        # TODO: Compute
-        #   - dx, the gradient of the loss with respect to x
-        #   - dw, the gradient of the loss with respect to w
-        #   - db, the gradient of the loss with respect to b
-        #  Note: You should ACCUMULATE gradients in dw and db.
-        # ====== YOUR CODE: ======
-        raise NotImplementedError()
-        # ========================
+        # 1. Gradient with respect to bias (db)
+        # Sum dout over the batch dimension (N)
+        db = dout.sum(dim=0)
+        
+        # 2. Gradient with respect to weights (dw)
+        # dw = dout^T @ X
+        # Since X is (N, Din) and dout is (N, Dout), we need dout.t() @ x
+        dw = dout.t() @ x
+        
+        # 3. Gradient with respect to input (dx)
+        # dx = dout @ W
+        # Since dout is (N, Dout) and W is (Dout, Din), this is a direct matmul
+        dx = dout @ self.w
+        
+        # ACCUMULATE gradients in self.dw and self.db
+        self.dw += dw
+        self.db += db
 
         return dx
 
@@ -295,18 +285,30 @@ class CrossEntropyLoss(Layer):
             definition above. A scalar.
         """
 
-        N = x.shape[0]
-
-        # Shift input for numerical stability
+        # Shift input for numerical stability (already done by the provided code)
         xmax, _ = torch.max(x, dim=1, keepdim=True)
         x = x - xmax
+        
+        # 1. Calculate the log of the denominator term: log(sum_k e^(x_k))
+        # This is log(sum(exp(x)))
+        exp_x = torch.exp(x)
+        sum_exp_x = torch.sum(exp_x, dim=1, keepdim=True)
+        log_sum_exp = torch.log(sum_exp_x) # Shape (N, 1)
 
-        # TODO: Compute the cross entropy loss using the last formula from the
-        #  notebook (i.e. directly using the class scores).
-        # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        # 2. Get the score of the correct class (x_y)
+        # Use torch.gather to select the score x_y from each sample using the index y
+        # y is shape (N,). Need to reshape y to (N, 1) for gather.
+        x_y = torch.gather(x, dim=1, index=y.view(-1, 1)) # Shape (N, 1)
+
+        # 3. Calculate the loss per sample: -x_y + log(sum_k e^(x_k))
+        loss_per_sample = -x_y + log_sum_exp # Shape (N, 1)
+
+        # 4. Final loss is the mean over the batch
+        loss = torch.mean(loss_per_sample) # Scalar
         # ========================
 
+        # Note: We save the numerically stable shifted input 'x' and labels 'y'
+        # for the backward pass.
         self.grad_cache["x"] = x
         self.grad_cache["y"] = y
         return loss
@@ -320,10 +322,26 @@ class CrossEntropyLoss(Layer):
         x = self.grad_cache["x"]
         y = self.grad_cache["y"]
         N = x.shape[0]
+        D = x.shape[1]
 
         # TODO: Calculate the gradient w.r.t. the input x.
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        
+        # 1. Calculate Softmax output (predicted probabilities, y_hat)
+        # We use the shifted scores x saved from the forward pass
+        exp_x = torch.exp(x)
+        y_hat = exp_x / torch.sum(exp_x, dim=1, keepdim=True) # Shape (N, D)
+
+        # 2. Create the one-hot encoding of the ground truth labels (y)
+        # Shape (N, D). Uses y indices to place 1.0.
+        y_one_hot = torch.zeros_like(y_hat).scatter_(1, y.view(-1, 1), 1.0)
+        
+        # 3. Calculate the derivative: dx = y_hat - y_one_hot
+        dx = y_hat - y_one_hot
+        
+        # 4. Scale by the upstream gradient (dout) and normalize by batch size (N)
+        # Note: Since the loss in forward was the MEAN, the backward gradient must be scaled by 1/N.
+        dx = (dx / N) * dout
         # ========================
 
         return dx
@@ -378,23 +396,27 @@ class Sequential(Layer):
 
     def forward(self, x, **kw):
         out = None
+        pre_layer_out = x
 
-        # TODO: Implement the forward pass by passing each layer's output
-        #  as the input of the next.
-        # ====== YOUR CODE: ======
-        raise NotImplementedError()
-        # ========================
+        for layer in self.layers:
+            out = layer(pre_layer_out)
+            pre_layer_out = out
 
         return out
 
     def backward(self, dout):
         din = None
-
-        # TODO: Implement the backward pass.
-        #  Each layer's input gradient should be the previous layer's output
-        #  gradient. Behold the backpropagation algorithm in action!
-        # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        # Start with the gradient coming into the last layer (dout)
+        current_gradient = dout
+        
+        # Iterate through the layers in reverse order for backpropagation
+        for layer in reversed(self.layers):
+            # The backward function returns the gradient w.r.t. its input (dx),
+            # which then becomes the upstream gradient (dout) for the layer before it.
+            current_gradient = layer.backward(current_gradient)
+        
+        # The final gradient (din) is the gradient w.r.t. the overall input 'x'
+        din = current_gradient
         # ========================
 
         return din
@@ -402,9 +424,9 @@ class Sequential(Layer):
     def params(self):
         params = []
 
-        # TODO: Return the parameter tuples from all layers.
-        # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        # Collects all (parameter, gradient) tuples from every sub-layer
+        for layer in self.layers:
+            params.extend(layer.params())
         # ========================
 
         return params
