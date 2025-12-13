@@ -87,11 +87,11 @@ class Trainer(abc.ABC):
             # Calculating the train and test results using the given functions.
             train_result = self.train_epoch(dl_train)
             test_result = self.test_epoch(dl_test)
-            # Getting the losses and accuracy from the EpochResult objects returned by the (train\test)_epoch function. 
-            # Adding these values to the (train\test)_(loss\accuracy) arrays, respectively. 
-            train_loss.append(train_result.losses)
+            # Getting the losses and accuracy from the EpochResult objects returned by the (train\test)_epoch function.
+            # Adding these values to the (train\test)_(loss\accuracy) arrays, respectively.
+            train_loss.append(sum(train_result.losses) / len(train_result.losses)) # Appending the avarage losses for each epoch
             train_acc.append(train_result.accuracy)
-            test_loss.append(test_result.losses)
+            test_loss.append(sum(test_result.losses) / len(test_result.losses))
             test_acc.append(test_result.accuracy)
             
             # Increment the actual number of epochs
@@ -344,7 +344,7 @@ class LayerTrainer(Trainer):
 
         # ========================
 
-        return BatchResult(loss, num_correct)
+        return BatchResult(loss.item(), num_correct)
 
     def test_batch(self, batch) -> BatchResult:
         X, y = batch
@@ -362,4 +362,4 @@ class LayerTrainer(Trainer):
 
         # ========================
 
-        return BatchResult(loss, num_correct)
+        return BatchResult(loss.item(), num_correct)

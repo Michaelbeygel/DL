@@ -1,5 +1,6 @@
 import abc
 import torch
+import random
 
 
 class Layer(abc.ABC):
@@ -132,7 +133,7 @@ class Sigmoid(Layer):
         dimension, and * is any number of other dimensions.
         :return: Sigmoid of each sample in x.
         """
-
+        
         out = 1.0 / (1.0 + torch.exp(-x))
         self.grad_cache["out"] = out
 
@@ -362,7 +363,19 @@ class Dropout(Layer):
         #  Notice that contrary to previous layers, this layer behaves
         #  differently a according to the current training_mode (train/test).
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        
+        if self.training_mode:
+            # Zero in probability p
+            mask = (torch.rand_like(x) > self.p).float()
+            scale = 1.0 / (1.0 - self.p)
+            # Keep mask and scale for backward pass
+            self.grad_cache["mask"] = mask
+            self.grad_cache["scale"] = scale
+
+            out = x*mask*scale
+        else:
+            out = x
+            
         # ========================
 
         return out
@@ -370,7 +383,15 @@ class Dropout(Layer):
     def backward(self, dout):
         # TODO: Implement the dropout backward pass.
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+
+        if self.training_mode:
+            mask = self.grad_cache["mask"]
+            scale = self.grad_cache["scale"]
+
+            dx = dout*mask*scale
+        else:
+            dx = dout
+
         # ========================
 
         return dx
