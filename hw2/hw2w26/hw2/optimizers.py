@@ -1,6 +1,7 @@
 import abc
 import torch
 from torch import Tensor
+import numpy as np
 
 
 class Optimizer(abc.ABC):
@@ -93,11 +94,14 @@ class MomentumSGD(Optimizer):
 
         # TODO: Add your own initializations as needed.
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        
+        # Velocity for each parameter.
+        self.velocities = [torch.zeros_like(p) for p, _ in self.params]
+
         # ========================
 
     def step(self):
-        for p, dp in self.params:
+        for i, (p, dp) in enumerate(self.params):
             if dp is None:
                 continue
 
@@ -105,7 +109,13 @@ class MomentumSGD(Optimizer):
             # update the parameters tensor based on the velocity. Don't forget
             # to include the regularization term.
             # ====== YOUR CODE: ======
-            raise NotImplementedError()
+            
+            grad = dp + self.reg*p
+            # Update v_(t+1) <- mu*(v_t)-eta*grad
+            self.velocities[i] = (self.momentum*self.velocities[i]) - (self.learn_rate*grad)
+            # Update p_(t+1) <- p_t + v_(t+1)
+            p.data += self.velocities[i]
+
             # ========================
 
 
@@ -126,11 +136,12 @@ class RMSProp(Optimizer):
 
         # TODO: Add your own initializations as needed.
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        # Initialize r (moving average of squared gradients) for each parameter.
+        self.r = [torch.zeros_like(p) for p, _ in self.params]
         # ========================
 
     def step(self):
-        for p, dp in self.params:
+        for i, (p, dp) in enumerate(self.params):
             if dp is None:
                 continue
 
@@ -139,5 +150,9 @@ class RMSProp(Optimizer):
             # average of it's previous gradients. Use it to update the
             # parameters tensor.
             # ====== YOUR CODE: ======
-            raise NotImplementedError()
+            r = self.r[i]
+            grad = dp + self.reg * p
+            
+            r[:] = self.decay * r + (1 - self.decay) * grad.pow(2)
+            p.data -= self.learn_rate * grad / (torch.sqrt(r) + self.eps)
             # ========================

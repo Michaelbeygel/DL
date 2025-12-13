@@ -83,7 +83,20 @@ class Trainer(abc.ABC):
             #  - Use the train/test_epoch methods.
             #  - Save losses and accuracies in the lists above.
             # ====== YOUR CODE: ======
-            raise NotImplementedError()
+            
+            # Calculating the train and test results using the given functions.
+            train_result = self.train_epoch(dl_train)
+            test_result = self.test_epoch(dl_test)
+            # Getting the losses and accuracy from the EpochResult objects returned by the (train\test)_epoch function. 
+            # Adding these values to the (train\test)_(loss\accuracy) arrays, respectively. 
+            train_loss.append(train_result.losses)
+            train_acc.append(train_result.accuracy)
+            test_loss.append(test_result.losses)
+            test_acc.append(test_result.accuracy)
+            
+            # Increment the actual number of epochs
+            actual_num_epochs += 1
+
             # ========================
 
             # TODO:
@@ -92,14 +105,24 @@ class Trainer(abc.ABC):
             #  - Optional: Implement checkpoints. You can use the save_checkpoint
             #    method on this class to save the model to the file specified by
             #    the checkpoints argument.
+            
+            # Check for improvement in test accuracy
             if best_acc is None or test_result.accuracy > best_acc:
                 # ====== YOUR CODE: ======
-                raise NotImplementedError()
+                best_acc = test_result.accuracy
+                epochs_without_improvement = 0
+                if checkpoints:
+                    self.save_checkpoint(f"{checkpoints}.pt")
                 # ========================
             else:
                 # ====== YOUR CODE: ======
-                raise NotImplementedError()
+                epochs_without_improvement += 1
                 # ========================
+
+            # Check for early stopping
+            if early_stopping is not None and epochs_without_improvement >= early_stopping:
+                self._print(f"--- Early stopping triggered after {epoch + 1} epochs ---", verbose)
+                break
 
         return FitResult(actual_num_epochs, train_loss, train_acc, test_loss, test_acc)
 
@@ -143,6 +166,7 @@ class Trainer(abc.ABC):
         :return: A BatchResult containing the value of the loss function and
             the number of correctly classified samples in the batch.
         """
+
         raise NotImplementedError()
 
     @abc.abstractmethod
@@ -286,7 +310,9 @@ class ClassifierTrainer(Trainer):
 class LayerTrainer(Trainer):
     def __init__(self, model, loss_fn, optimizer):
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        super().__init__(model) # Calling the constructor of the parent's class
+        self.loss_fn = loss_fn
+        self.optimizer = optimizer
         # ========================
 
     def train_batch(self, batch) -> BatchResult:
@@ -300,15 +326,19 @@ class LayerTrainer(Trainer):
         #    not a tensor) as num_correct.
         # ====== YOUR CODE: ======
         
+        # Flatten the images.
+        X = X.reshape(X.shape[0], -1)
+        # Zeroing past gradients.
+        self.optimizer.zero_grad()
         # - Forward pass
         predictions = self.model(X) # Computes forward pass implicitly.
         # Calculate loss function on the predictions.
         loss = self.loss_fn(predictions, y)
-        # - Backward pass
-        loss.backward()
-
-        self.optimiser.step()
-        self.optimiser.zero_grad()
+        # - Backward pass (manual, using our custom layer backward implementations)
+        dout = self.loss_fn.backward(dout=1.0)
+        dout = self.model.backward(dout)
+        
+        self.optimizer.step()
 
         num_correct = (predictions.argmax(dim=1) == y).sum().item()
 
@@ -321,7 +351,15 @@ class LayerTrainer(Trainer):
 
         # TODO: Evaluate the Layer model on one batch of data.
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        
+        # Flatten the images.
+        X = X.reshape(X.shape[0], -1)
+        # Predict and get the number of correct predictions
+        predictions = self.model(X)
+        num_correct = (predictions.argmax(dim=1) == y).sum().item()
+        # Calculate the loss
+        loss = self.loss_fn(predictions, y)
+
         # ========================
 
         return BatchResult(loss, num_correct)
