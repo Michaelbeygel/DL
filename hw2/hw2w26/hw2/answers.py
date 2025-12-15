@@ -9,28 +9,96 @@ math (delimited with $$).
 # Part 1 (Backprop) answers
 
 part1_q1 = r"""
-**Your answer:**
+**1**
 
+**1.1 Full Jacobian Shape:**
 
-Write your answer using **markdown** and $\LaTeX$:
-```python
-# A code block
-a = 2
-```
-An equation: $e^{i\pi} -1 = 0$
+The total number of elements in $\mat{X}$ is $N \times D_{\text{in}} = 64 \times 1024 = 65,536$.
 
+The total number of elements in $\mat{Y}$ is $N \times D_{\text{out}} = 64 \times 512 = 32,768$.
+
+The shape of the full Jacobian $\frac{\partial \mat{Y}}{\partial \mat{X}}$ is:
+
+$$(N \times D_{\text{out}}) \times (N \times D_{\text{in}}) = (32,768) \times (65,536) = 2,147,483,648$$
+
+**1.2 Block Matrix Structure:**
+
+When viewed as a block matrix with blocks of shape $(D_{\text{out}} \times D_{\text{in}}) = (512 \times 1024)$:
+
+The Jacobian is a **diagonal block matrix**. The structure is:
+- **Diagonal blocks** (where $i = j$): Each diagonal block equals $\mat{W}^T$ because sample $i$'s output depends only on sample $i$'s input
+- **Off-diagonal blocks** (where $i \neq j$): All zeros, because the output of sample $i$ is independent of the input of sample $j$
+
+**1.3 Optimization:**
+
+Because the Jacobian is a diagonal block matrix whose diagonal blocks are all identical (each block equals $\mat{W}^\top$), we do not need to store every block separately. Instead, we can store a single copy of the weight matrix.
+
+- **Optimized storage:** one copy of the weight matrix $\mat{W}$ (or $\mat{W}^\top$) with shape $(512) \times (1024)$.
+
+This reduces storage from the full Jacobian size of $(32,768)\times(65,536)$ elements down to $512\times1024 = 524{,}288$ elements.
+
+**1.4 Computing Gradient Without Materializing Jacobian:**
+Given $\delta\mathbf{Y}\in\mathbb{R}^{N\times512}$, compute per-sample
+$$\delta\mathbf{x}^{(i)} = \delta\mathbf{y}^{(i)}\,\mathbf{W}\quad((1,512)\cdot(512,1024)=(1,1024))$$
+
+Vectorized:
+
+$$
+\delta X = \begin{bmatrix}
+\delta x^{(1)} \\
+\delta x^{(2)} \\
+\vdots \\
+\delta x^{(N)}
+\end{bmatrix}
+= \begin{bmatrix}
+\delta y^{(1)} \\
+\delta y^{(2)} \\
+\vdots \\
+\delta y^{(N)}
+\end{bmatrix} W
+= \delta Y\,W
+$$
+
+Pass the matrix $\delta X$ to the previous layer's backward as its downstream gradient to continue propagation.
+
+**1.5 Jacobian w.r.t. Weights:**
+For the Jacobian $\frac{\partial \mat{Y}}{\partial \mat{W}}$:
+
+- **Full Jacobian shape:**
+
+$$
+(N\cdot D_{\mathrm{out}}) \times (D_{\mathrm{out}}\cdot D_{\mathrm{in}}) = (32{,}768) \times (524{,}288) = 17,179,869,184.
+$$
+
+- **Block shape (if arranged as blocks):**
+
+$$
+(D_{\mathrm{out}}\times D_{\mathrm{in}}) = (512\times 1024).
+$$
+
+Brief explanation: For a single sample $i$ and output unit $p$ we have
+$y_{i,p}=\sum_r W_{p,r}x_{i,r}$, so differentiating w.r.t. the $p$-th row of
+$W$ yields the input row $x^{(i)}$. Thus each output's derivative places
+the vector $x^{(i)}$ in the corresponding output-row, producing blocks of
+size $D_{\mathrm{out}}\times D_{\mathrm{in}}$.
 """
 
 part1_q2 = r"""
-**Your answer:**
+**Second-Order Derivatives in Gradient Descent**
 
+The second-order derivative (Hessian) can be helpful in optimization, but it depends on the context:
 
-Write your answer using **markdown** and $\LaTeX$:
-```python
-# A code block
-a = 2
-```
-An equation: $e^{i\pi} -1 = 0$
+**Why NOT always helpful:**
+
+1. **Computational Cost**: Computing the full Hessian matrix is extremely expensive. For a network with $n$ parameters, the Hessian is $n \times n$, requiring $\mathcal{O}(n^2)$ memory and $\mathcal{O}(n^3)$ time for eigendecomposition.
+
+2. **Storage**: For modern deep networks with millions of parameters, storing the full Hessian is infeasible.
+
+**When Second-Order Derivatives ARE Helpful:**
+
+   **Newton's Method**: Uses the inverse Hessian to determine step direction:
+   $$\vec{\theta}_{t+1} = \vec{\theta}_t - \mathcal{H}^{-1} \nabla L$$
+   Mult by $\mathcal{H}^{-1}$ automatically adjusts the step size, taking larger steps in flat regions (low curvature) and smaller steps in steep regions (high curvature), based on the function's second derivative.
 
 """
 
