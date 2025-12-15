@@ -281,10 +281,24 @@ class ClassifierTrainer(Trainer):
         #  - Update parameters
         #  - Classify and calculate number of correct predictions
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+
+        # Zeroing past gradients.
+        self.optimizer.zero_grad()
+        # - Forward pass
+        z = self.model(X) # Computes forward pass implicitly.
+        # Calculate loss function on the predictions.
+        batch_loss = self.loss_fn(z, y)
+        # - Backward pass(Calculates the gradients for the optimizer to use).
+        batch_loss.backward()
+        # - Update parameters.
+        self.optimizer.step()
+        # - Classify and calculate number of correct predictions.
+        predictions = self.model.classify(X)
+        num_correct = (predictions==y).sum().item()
+
         # ========================
 
-        return BatchResult(batch_loss, num_correct)
+        return BatchResult(batch_loss.item(), num_correct)
 
     def test_batch(self, batch) -> BatchResult:
         X, y = batch
@@ -301,7 +315,15 @@ class ClassifierTrainer(Trainer):
             #  - Forward pass
             #  - Calculate number of correct predictions
             # ====== YOUR CODE: ======
-            raise NotImplementedError()
+            
+            # - Forward pass
+            z = self.model(X) # Computes forward pass implicitly.
+            # Calculate loss function on the predictions.
+            batch_loss = self.loss_fn(z, y).item()
+            # - Classify and calculate number of correct predictions.
+            predictions = self.model.classify(X)
+            num_correct = (predictions==y).sum().item()
+
             # ========================
 
         return BatchResult(batch_loss, num_correct)

@@ -45,7 +45,19 @@ def mlp_experiment(
     #  Note: use print_every=0, verbose=False, plot=False where relevant to prevent
     #  output from this function.
     # ====== YOUR CODE: ======
-    raise NotImplementedError()
+    
+    # Create an MLP first. Be used later in the binary classifier.
+    hidden_layer_activation = 'relu'
+    output_layer_activation = "none"
+    x, y = next(iter(dl_train)) # Help to find in_dim
+    in_dim = x.shape[1]
+    # Create the mlp. Note that the final dim is 2 for the binary classification.
+    mlp = MLP(in_dim=in_dim, dims=[*[width]*depth, 2], nonlins=[*[hidden_layer_activation]*(depth-1), output_layer_activation])
+    
+    # - Create a BinaryClassifier model.
+    model = BinaryClassifier(mlp)
+
+    
     # ========================
     return model, thresh, valid_acc, test_acc
 

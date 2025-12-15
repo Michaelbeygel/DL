@@ -45,6 +45,7 @@ class MLP(nn.Module):
             Length should match 'dims'.
         """
         assert len(nonlins) == len(dims)
+        super().__init__()
         self.in_dim = in_dim
         self.out_dim = dims[-1]
 
@@ -55,7 +56,23 @@ class MLP(nn.Module):
         #  - Either instantiate the activations based on their name or use the provided
         #    instances.
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        
+        # Create a list of nn.Linear modules, each with the given dimentions.
+        self.hidden_layers = nn.ModuleList([nn.Linear(in_dim, dims[0], bias=True)])
+        self.hidden_layers.extend([nn.Linear(dims[l-1], dims[l], bias=True) for l in range(1, len(dims))])
+
+        # Check for the type of nonlins, initialize a list of the activations functions respectively.
+        self.activations = nn.ModuleList()
+        for nonlin in nonlins:
+            if isinstance(nonlin, str):
+                # nonlin is a string key, instantiate from ACTIVATIONS dict
+                activation_cls = ACTIVATIONS[nonlin]
+                activation_kwargs = ACTIVATION_DEFAULT_KWARGS[nonlin]
+                self.activations.append(activation_cls(**activation_kwargs))
+            else:
+                # nonlin is already an nn.Module instance, use it directly
+                self.activations.append(nonlin)
+
         # ========================
 
     def forward(self, x: Tensor) -> Tensor:
@@ -66,5 +83,17 @@ class MLP(nn.Module):
         # TODO: Implement the model's forward pass. Make sure the input and output
         #  shapes are as expected.
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        
+        # Make sure the input shape is as expected.
+        assert x.shape[1] == self.in_dim
+
+        # Apply hidden layers and activations in a loop throught the MLP.
+        for hiddenLayer,activation in zip(self.hidden_layers, self.activations):
+            x = activation(hiddenLayer(x))
+
+        # Make sure the output shape is as expected.
+        assert x.shape[1] == self.out_dim
+
+        # Return x after it has been through the MLP.
+        return x
         # ========================
