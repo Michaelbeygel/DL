@@ -176,13 +176,37 @@ def part2_dropout_hp():
 part2_q1 = r"""
 **Your answer:**
 
+1. First, we can observe that the model without dropout do not overfit in earlier epochs.
+Becuase the initial model do not overfit, adding dropout would probably mainly hurt capacity, rather then add generality.
+Also, we would expect that the model would converge slower. 
+That is because with dropout fewer neurons are active per batch, which makes it harder to fit the train data and slows loss minimization.
 
-Write your answer using **markdown** and $\LaTeX$:
-```python
-# A code block
-a = 2
-```
-An equation: $e^{i\pi} -1 = 0$
+    The graphs of no-dropout vs dropout match the intuition explained above.
+
+    From the accuracy plots, we see that training accuracy decreases as dropout increases, as expected.
+Without dropout, the model starts to slightly overfit around epoch 15.
+Around epoch 15, the model with dropout=0 stops improving test-set wise, and the model with dropout=0.4 keeps improving.
+Therefore because of the slight overfit, a small dropout(0.4) does help us get better generality.
+
+    Additionally, the train_loss graph shows that higher dropout leades to slower convergence, as expected.
+
+    Lastly, note that when the dropout is too big, as in dropout=0.8, our model is very weak and not learns a lot, resulting in underfitting.
+
+2. Let's compare the low-dropout setting to the high-dropout setting.
+
+    Dropout is a part of regularization. 
+    Regularization encourages better generalization. 
+    But, adding "too much" might make it very hard for the model to learn and therefore cause underfitting. 
+    As a result, when adding regularization we would want to be in the "sweet spot" between under and over fitting.
+    
+    We can see from the graphs, that the model with dropout=0.8 result in bad losses and accuracies, both in the train and test sets.
+That because it adds too much regularization, as explained above. 
+Also we can see that the loss function of that model does not decrease. 
+That strengthens our intuition that it is very hard for the model to learn in that condition. 
+    
+    In comparison, the model with dropout=0.4 have higher accuracies in the train and test sets. 
+Since the training and test accuracies are similar across epochs, we can deduce that the model do not overfit.
+Also, the loss functions in the train and test sets seems to have a gradually improve over the epochs, which the regularization is not too strong.
 
 """
 
