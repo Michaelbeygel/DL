@@ -213,26 +213,49 @@ Also, the loss functions in the train and test sets seems to have a gradually im
 part2_q2 = r"""
 **Your answer:**
 
+Yes, it is possible. 
+We will provide an example where both the loss and the accuracy of the model decrease.
 
-Write your answer using **markdown** and $\LaTeX$:
-```python
-# A code block
-a = 2
-```
-An equation: $e^{i\pi} -1 = 0$
+First, let's take a look at the cross entropy loss for a given batch of size N:
 
+$
+\mathcal{L}
+= -\frac{1}{N} \sum_{i=1}^{N}
+\left[
+y_i \log(\hat{y}_i) + (1 - y_i)\log(1 - \hat{y}_i)
+\right]
+$
+
+The cross entropy loss measures how much probability the model assigns to the true label.
+It is sensitive to the confidence of the prediction.
+Accuracy, on the other hand, depends only whether the predicted class matches the true lables.
+
+With that intuition in mind, let's look at an example:
+We will look at a binary classification problem.
+- Epoch A:
+    9 correct predictions, with high loss. 
+    1 incorrect prediction.
+
+    The correct predictions are correct because they passed some threshold, but still have low confidence in the true labels.
+- Epoch B:
+    8 correct predictions, with low loss.
+    2 incorrect predictions.
+
+    The model assign high probability to the correct predictions. 
+
+The loss decrease from A to B because there are more predictions that are close to their true labels.
+And the accuracy decrease as well.
+
+Therefore it is possible for both the loss and the accuraacy to decrease.
+
+
+    
 """
 
 part2_q3 = r"""
 **Your answer:**
 
 
-Write your answer using **markdown** and $\LaTeX$:
-```python
-# A code block
-a = 2
-```
-An equation: $e^{i\pi} -1 = 0$
 
 """
 
