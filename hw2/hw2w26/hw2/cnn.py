@@ -68,20 +68,36 @@ class CNN(nn.Module):
         self.mlp = self._make_mlp()
 
     def _make_feature_extractor(self):
-        in_channels, in_h, in_w, = tuple(self.in_size)
+        in_channels, in_h, in_w = tuple(self.in_size)
 
         layers = []
-        # TODO: Create the feature extractor part of the model:
-        #  [(CONV -> ACT)*P -> POOL]*(N/P)
-        #  Apply activation function after each conv, using the activation type and
-        #  parameters.
-        #  Apply pooling to reduce dimensions after every P convolutions, using the
-        #  pooling type and pooling parameters.
-        #  Note: If N is not divisible by P, then N mod P additional
-        #  CONV->ACTs should exist at the end, without a POOL after them.
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        curr_in_channels = in_channels
+        
+        # Get the activation and pooling classes
+        ActivationLayer = ACTIVATIONS[self.activation_type]
+        PoolingLayer = POOLINGS[self.pooling_type]
 
+        for i, out_channels in enumerate(self.channels):
+            # 1. Add Convolutional Layer
+            layers.append(
+                nn.Conv2d(curr_in_channels, out_channels, **self.conv_params)
+            )
+            
+            # 2. Add Activation Layer
+            layers.append(
+                ActivationLayer(**self.activation_params)
+            )
+            
+            # Update channels for the next iteration
+            curr_in_channels = out_channels
+            
+            # 3. Add Pooling Layer every P layers
+            # We use (i + 1) because i is 0-indexed.
+            if (i + 1) % self.pool_every == 0:
+                layers.append(
+                    PoolingLayer(**self.pooling_params)
+                )
         # ========================
         seq = nn.Sequential(*layers)
         return seq
@@ -95,31 +111,53 @@ class CNN(nn.Module):
         rng_state = torch.get_rng_state()
         try:
             # ====== YOUR CODE: ======
-            raise NotImplementedError()
+            # 1. Create a dummy input with the same shape as your expected input images
+            # self.in_size is (C, H, W), so we unpack it into (Batch, C, H, W)
+            dummy_input = torch.zeros(1, *self.in_size)
+            
+            # 2. Run the dummy input through the feature extractor
+            # We use torch.no_grad() as a best practice to ensure no graph is built
+            with torch.no_grad():
+                output = self.feature_extractor(dummy_input)
+            
+            # 3. The number of features is the total number of elements in the output
+            # (excluding the batch dimension).
+            return output.numel()
             # ========================
         finally:
             torch.set_rng_state(rng_state)
 
     def _make_mlp(self):
-        # TODO:
-        #  - Create the MLP part of the model: (FC -> ACT)*M -> Linear
-        #  - Use the the MLP implementation from Part 1.
-        #  - The first Linear layer should have an input dim of equal to the number of
-        #    convolutional features extracted by the convolutional layers.
-        #  - The last Linear layer should have an output dim of out_classes.
-        mlp: MLP = None
-        # ====== YOUR CODE: ======
-        raise NotImplementedError()
-        # ========================
+        in_features = self._n_features()
+        mlp_dims = [*self.hidden_dims, self.out_classes]
+
+        # Get the actual activation class (e.g., nn.ReLU or nn.LeakyReLU)
+        ActivationLayer = ACTIVATIONS[self.activation_type]
+        
+        nonlins = []
+        for _ in range(len(self.hidden_dims)):
+            # Instantiate the activation with the params from CNN __init__
+            nonlins.append(ActivationLayer(**self.activation_params))
+        
+        # Add Identity for the final layer
+        nonlins.append(nn.Identity())
+
+        mlp = MLP(in_dim=in_features, dims=mlp_dims, nonlins=nonlins)
         return mlp
 
     def forward(self, x: Tensor):
-        # TODO: Implement the forward pass.
-        #  Extract features from the input, run the classifier on them and
-        #  return class scores.
-        out: Tensor = None
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        # 1. Extract features using the convolutional layers
+        # Input shape: [Batch, C, H, W]
+        features = self.feature_extractor(x)
+        
+        # 2. Flatten the 4D tensor into a 2D tensor
+        # We keep the batch dimension (dim 0) and collapse everything else.
+        # Shape change: [Batch, Channels, Height, Width] -> [Batch, Features]
+        flattened = features.view(features.size(0), -1)
+        
+        # 3. Pass through the MLP to get class scores (logits)
+        out = self.mlp(flattened)
         # ========================
         return out
 
@@ -163,8 +201,6 @@ class ResidualBlock(nn.Module):
         if activation_type not in ACTIVATIONS:
             raise ValueError("Unsupported activation type")
 
-        self.main_path, self.shortcut_path = None, None
-
         # TODO: Implement a generic residual block.
         #  Use the given arguments to create two nn.Sequentials:
         #  - main_path, which should contain the convolution, dropout,
@@ -179,16 +215,52 @@ class ResidualBlock(nn.Module):
         #  - Don't create layers which you don't use! This will prevent
         #    correct comparison in the test.
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
-        # ========================
+    # 1. Main Path
+        main_layers = []
+        curr_in = in_channels
+        ActivationLayer = ACTIVATIONS[activation_type]
+        
+        num_convs = len(channels)
+        for i in range(num_convs):
+            out_channels = channels[i]
+            k_size = kernel_sizes[i]
+            
+            main_layers.append(
+                nn.Conv2d(
+                    curr_in, out_channels, kernel_size=k_size, 
+                    padding=(k_size - 1) // 2, bias=True
+                )
+            )
+            
+            # Pattern: [Conv -> Dropout -> BN -> Act] * (n-1) -> Final Conv
+            if i < num_convs - 1:
+                if dropout > 0:
+                    main_layers.append(nn.Dropout2d(p=dropout))
+                if batchnorm:
+                    main_layers.append(nn.BatchNorm2d(out_channels))
+                main_layers.append(ActivationLayer(**activation_params))
+            
+            curr_in = out_channels
+
+        self.main_path = nn.Sequential(*main_layers)
+
+        # 2. Shortcut Path
+        # We need a 1x1 conv if:
+        # - Channels change (in_channels != channels[-1])
+        if in_channels != channels[-1]:
+            self.shortcut_path = nn.Sequential(
+                nn.Conv2d(in_channels, channels[-1], kernel_size=1, bias=False)
+            )
+        else:
+            # When stride=1 and channels match, this is just an identity wire
+            self.shortcut_path = nn.Sequential(nn.Identity())
+
+
 
     def forward(self, x: Tensor):
-        # TODO: Implement the forward pass. Save the main and residual path to `out`.
-        out: Tensor = None
-        # ====== YOUR CODE: ======
-        raise NotImplementedError()
-        # ========================
-        out = torch.relu(out)
+        main = self.main_path(x)
+        shortcut = self.shortcut_path(x)
+        out = torch.relu(main + shortcut)
         return out
 
 
@@ -226,8 +298,20 @@ class ResidualBottleneckBlock(ResidualBlock):
         #  Initialize the base class in the right way to produce the bottleneck block
         #  architecture.
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
-        # ========================
+        full_channels = [inner_channels[0]] + list(inner_channels) + [in_out_channels]
+        
+        # Kernel logic:
+        # First conv is 1x1 (entry)
+        # Middle convs are inner_kernel_sizes
+        # Last conv is 1x1 (exit)
+        full_kernels = [1] + list(inner_kernel_sizes) + [1]
+        
+        super().__init__(
+            in_channels=in_out_channels,
+            channels=full_channels,
+            kernel_sizes=full_kernels,
+            **kwargs
+        )
 
 
 class ResNet(CNN):
@@ -272,8 +356,65 @@ class ResNet(CNN):
         #  - Use bottleneck blocks if requested and if the number of input and output
         #    channels match for each group of P convolutions.
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
-        # ========================
-        seq = nn.Sequential(*layers)
-        return seq
+        curr_in_channels = in_channels
+        
+        # P is the number of convolutions per residual block
+        P = self.pool_every
+        channels_list = self.channels
+        N = len(channels_list)
 
+        # Iterate through channels in groups of P
+        for i in range(0, N, P):
+            # Extract the slice of channels for this block
+            group_channels = channels_list[i : i + P]
+            num_in_group = len(group_channels)
+            
+            # Use 3x3 dimension-preserving kernels for all internal convolutions
+            group_kernels = [3] * num_in_group
+            
+            # Logic for choosing between Bottleneck and Standard Residual Block
+            # Requirement: Use bottleneck if requested AND if input/output channels match
+            if self.bottleneck and curr_in_channels == group_channels[-1] and num_in_group >= 2:
+                # However, to match your ResidualBottleneckBlock implementation:
+                # inner_channels are the middle layers.
+                # Let's adjust to ensure exactly P layers total.
+                # Block = 1 (squeeze) + len(inner_channels) + 1 (expand)
+                # So len(inner_channels) should be num_in_group - 2
+                bottleneck_inners = group_channels[1:-1]
+                bottleneck_kernels = group_kernels[1:-1]
+                
+                layers.append(
+                    ResidualBottleneckBlock(
+                        in_out_channels=curr_in_channels,
+                        inner_channels=bottleneck_inners,
+                        inner_kernel_sizes=bottleneck_kernels,
+                        batchnorm=self.batchnorm,
+                        dropout=self.dropout,
+                        activation_type=self.activation_type,
+                        activation_params=self.activation_params
+                    )
+                )
+            else:
+                # Standard Residual Block
+                layers.append(
+                    ResidualBlock(
+                        in_channels=curr_in_channels,
+                        channels=group_channels,
+                        kernel_sizes=group_kernels,
+                        batchnorm=self.batchnorm,
+                        dropout=self.dropout,
+                        activation_type=self.activation_type,
+                        activation_params=self.activation_params
+                    )
+                )
+
+            # Update input tracker for the next block
+            curr_in_channels = group_channels[-1]
+
+            # Apply Pooling after every complete block of P convolutions
+            # Only if this wasn't a partial block at the very end
+            if (i + P) <= N:
+                pooling_layer = POOLINGS[self.pooling_type](**self.pooling_params)
+                layers.append(pooling_layer)
+
+        return nn.Sequential(*layers)

@@ -104,11 +104,15 @@ class ArgMaxClassifier(Classifier):
     """
 
     def _classify(self, y_proba: Tensor):
-        # TODO:
-        #  Classify each sample to one of C classes based on the highest score.
-        #  Output should be a (N,) integer tensor.
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        # y_proba shape: (N, C) where N is batch size and C is number of classes.
+        # We want to find the index of the maximum value along the class dimension (dim=1).
+        
+        # torch.argmax returns the indices of the maximum values.
+        y_pred = torch.argmax(y_proba, dim=1)
+        
+        # Ensure it is returned as an integer tensor (usually LongTensor)
+        return y_pred.to(torch.int64)
         # ========================
 
 
