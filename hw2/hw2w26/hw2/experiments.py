@@ -47,17 +47,32 @@ def mlp_experiment(
     # ====== YOUR CODE: ======
     
     # Create an MLP first. Be used later in the binary classifier.
-    hidden_layer_activation = 'relu'
+    hidden_layer_activation = 'lrelu'
     output_layer_activation = "none"
     x, y = next(iter(dl_train)) # Help to find in_dim
     in_dim = x.shape[1]
     # Create the mlp. Note that the final dim is 2 for the binary classification.
-    mlp = MLP(in_dim=in_dim, dims=[*[width]*depth, 2], nonlins=[*[hidden_layer_activation]*(depth-1), output_layer_activation])
+    mlp = MLP(in_dim=in_dim, dims=[*[width]*depth, 2], nonlins=[*[hidden_layer_activation]*(depth), output_layer_activation])
     
     # - Create a BinaryClassifier model.
-    model = BinaryClassifier(mlp)
+    model = BinaryClassifier(mlp) # Default threshold = 0.5
 
-    
+    # - Train using our ClassfierTrainer for n_epochs.
+    # Code is similar to code in the training section in Part3_MLP.ipynb .
+    loss_fn = torch.nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(params=model.parameters(), lr=1e-3)
+    trainer = ClassifierTrainer(model, loss_fn, optimizer)
+    # The fit_result object below will contain: actual_num_epochs, train_loss, train_acc, test_loss, test_acc.
+    # Where the losses and accuracies are array-like object that contained the relevant data for each epoch.
+    fit_result = trainer.fit(dl_train, dl_valid, num_epochs=n_epochs, print_every=0);
+    valid_acc = fit_result.test_acc[-1] # Get the validation set from the last epoch.
+
+    # - Use validation set for threshold selection.
+    thresh = select_roc_thresh(model, *dl_valid.dataset.tensors)
+
+    # - Set optimal threshold(above), and evaluate one epoch on the test set.
+    _, test_acc = trainer.test_epoch(dl_test)
+
     # ========================
     return model, thresh, valid_acc, test_acc
 
