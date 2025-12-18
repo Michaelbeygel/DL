@@ -21,12 +21,26 @@ The shape of the full Jacobian $\frac{\partial \mat{Y}}{\partial \mat{X}}$ is:
 
 $$(N \times D_{\text{out}}) \times (N \times D_{\text{in}}) = (32,768) \times (65,536) = 2,147,483,648$$
 
+
+<font color='red'>**- Boaz notes:**</font>
+(The question is about the shape, not the size.) 
+
+By simple calculations we would get that:
+
+The size of $\mat{X}$ is $64 \times 1024$.
+
+The size of $\mat{Y}$ is $64 \times 512$.
+
+The jacobian tensor would have to take into account the partial deriviative of each two elements from $\mat{X}$ and $\mat{Y}$.
+
+Therefore the shape of the jacobian tensor will be $(64 \times 512 \times 64 \times 1024)$.
+
 **1.2 Block Matrix Structure:**
 
 When viewed as a block matrix with blocks of shape $(D_{\text{out}} \times D_{\text{in}}) = (512 \times 1024)$:
 
 The Jacobian is a **diagonal block matrix**. The structure is:
-- **Diagonal blocks** (where $i = j$): Each diagonal block equals $\mat{W}^T$ because sample $i$'s output depends only on sample $i$'s input
+- **Diagonal blocks** (where $i = j$): Each diagonal block equals $\mat{W}^T$ because sample $i$'s output depends only on sample $i$'s input <font color='red'> s.t : $Y_i = X_iW^T$ </font>
 - **Off-diagonal blocks** (where $i \neq j$): All zeros, because the output of sample $i$ is independent of the input of sample $j$
 
 **1.3 Optimization:**
@@ -36,6 +50,12 @@ Because the Jacobian is a diagonal block matrix whose diagonal blocks are all id
 - **Optimized storage:** one copy of the weight matrix $\mat{W}$ (or $\mat{W}^\top$) with shape $(512) \times (1024)$.
 
 This reduces storage from the full Jacobian size of $(32,768)\times(65,536)$ elements down to $512\times1024 = 524{,}288$ elements.
+
+<font color='red'>**Boaz notes:**
+
+This reduces storage from the full Jacobian of shape $(64 \times 512 \times 64 \times 1024)$  down to $(512\times1024)$, which is $64^2$ times smaller.
+
+</font>
 
 **1.4 Computing Gradient Without Materializing Jacobian:**
 Given $\delta\mathbf{Y}\in\mathbb{R}^{N\times512}$, compute per-sample
@@ -132,6 +152,7 @@ def part2_optim_hp():
     # ========================
     return dict(
         wstd=wstd,
+
         lr_vanilla=lr_vanilla,
         lr_momentum=lr_momentum,
         lr_rmsprop=lr_rmsprop,
