@@ -124,7 +124,8 @@ def cnn_experiment(
     if model_type not in MODEL_TYPES:
         raise ValueError(f"Unknown model type: {model_type}")
     model_cls = MODEL_TYPES[model_type]
-
+    
+    
     # TODO: Train
     #  - Create model, loss, optimizer and trainer based on the parameters.
     #    Use the model you've implemented previously, cross entropy loss and
@@ -132,9 +133,47 @@ def cnn_experiment(
     #  - Run training and save the FitResults in the fit_res variable.
     #  - The fit results and all the experiment parameters will then be saved
     #   for you automatically.
-    fit_res = None
     # ====== YOUR CODE: ======
-    raise NotImplementedError()
+    dl_train = torch.utils.data.DataLoader(ds_train, bs_train, shuffle=True)
+    dl_test = torch.utils.data.DataLoader(ds_test, bs_test, shuffle=False)
+    
+    channels = []
+    for out_channels in filters_per_layer:
+        channels.extend([out_channels] * layers_per_block)
+    # Create Model
+    in_size = ds_train[0][0].shape # (3, 32, 32) for CIFAR10
+    # Extract specific dicts from kw if they exist, otherwise use defaults
+    p_params = kw.pop("pooling_params", {"kernel_size": 2}) # Default to 2 if not provided
+    c_params = kw.pop("conv_params", {"kernel_size": 3, "stride": 1, "padding": 1})
+
+    model = model_cls(
+        in_size=in_size,
+        out_classes=10,
+        channels=channels,
+        pool_every=pool_every,
+        hidden_dims=hidden_dims,
+        pooling_params=p_params,
+        conv_params=c_params,
+        **kw
+    ).to(device)
+
+    model = ArgMaxClassifier(model)
+
+    # Setup Training components
+    loss_fn = torch.nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(params=model.parameters(), lr=lr, weight_decay=reg)
+    trainer = ClassifierTrainer(model, loss_fn, optimizer)
+
+    # Run Training
+    fit_res = trainer.fit(
+        dl_train,
+        dl_test,
+        num_epochs=epochs,
+        max_batches=batches,
+        early_stopping=early_stopping,
+        checkpoints=checkpoints,
+        **kw
+    )
     # ========================
 
     save_experiment(run_name, out_dir, cfg, fit_res)
