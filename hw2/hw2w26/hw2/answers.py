@@ -351,13 +351,9 @@ def part3_optim_hp():
 part3_q1 = r"""
 **Your answer:**
 
-
-Write your answer using **markdown** and $\LaTeX$:
-```python
-# A code block
-a = 2
-```
-An equation: $e^{i\pi} -1 = 0$
+1. Let's explain what each type error means.
+    1. Optimization error:
+    ddd
 
 """
 
