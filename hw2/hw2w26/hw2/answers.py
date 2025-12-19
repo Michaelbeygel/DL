@@ -351,22 +351,67 @@ def part3_optim_hp():
 part3_q1 = r"""
 **Your answer:**
 
-1. Let's explain what each type error means.
+1. Let's explain what each type of error means.
     1. Optimization error:
-    ddd
+    
+        This error is caused by a bad optimizer(might be because bad hyper parameters).
+    It is the gap between the best possible model in the hypothesis class and the model found by training.
+        
+    2. Generalization error:
+
+        This error is caused by the model overfitting the training data.
+    It is defined as the gap between the models performance on the train and test sets.
+    We can look at it as a measure of how accuratly the model is able to predict outcomes for data it has never seen before.
+
+    3. Approximation error:
+    
+        This error caused by the limitations of the model to fit the data.
+    It is the gap between the best model in the hypothesis class and the true target function.
+    Good accuracy often leades to small approximation loss.
+    If our model is underfitting, then it has high approximation error.
+
+2. Let's take a look at each of the errors from the previous section of this question.
+
+    1. Our model does not have high optimization error.
+    
+        The given "moon" data the model is trained on is noisy by itself.
+        Therefore the ~95% accuracy we get in the train set can assure us that the optimizer is fine.
+
+    2. Our model have a little generalization error, but nothng major.
+
+        We can see from the plots that around epoch 8 begins a gap between the test and train in both plots.
+        This tells us that the model is slightly overfitting.
+        But, because we are still getting good performances in the test sets, the generalization error is not high.
+
+    3. Our model does not have high approximation error.
+
+        The model gets good results on the data, and is able to fit it quite good.
+        Therefore we can deduce that the hypothesis class is expressive enough to model the underlying structure of the data.
 
 """
 
 part3_q2 = r"""
 **Your answer:**
 
+Example 1 - prefer to optimize FPR.
 
-Write your answer using **markdown** and $\LaTeX$:
-```python
-# A code block
-a = 2
-```
-An equation: $e^{i\pi} -1 = 0$
+We would want to minimize False Positive Rate, if false positives have bad consequences.
+
+For example, suppose our model predicts whether or not a patient is free to leave the hospital.
+A false positve result would mean that we let an ill person leave the hospital. 
+He is then not treated as he should be, and might spread his disease!
+On the other hand, we can compromise on high False Negative Rate, which means that we keep a patient that can already leave the hospital.
+This will not have fatal consequences and therfore we care less about that.
+
+Example 2 - prefer optimize FNR.
+
+We would want to minimize False Negative Rate, if false negatives have bad consequences.
+
+For example, suppose our model predicts whether or not a patient need to take some medicine.
+A false negative would mean that a patient will not take his medicine.
+A false positive would mean that a patient will take a medicine he do not need to take.
+We assume that the medicine cannot cause health issues, but not taking it is unhealthy.
+Therefore we would prefer to optimize the FNR at the cost of increasing FPR.
 
 """
 
