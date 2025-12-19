@@ -1,0 +1,42 @@
+name: cs236781-hw-GPU
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python=3.10
+  - ipython
+  - jupyter
+  - jupyterlab
+  - nodejs>=12.0
+  - pip
+  - pytest
+  - pytest-xdist
+  - numpy
+  - pandas
+  - scikit-learn
+  - scipy
+  - matplotlib
+  - tqdm
+  # - pytorch=1.10.1
+  # - mkl<2022        # prevents crash when importing torch on M1 mac via rosetta2
+  # - torchvision=0.11.2
+  # - cudatoolkit=11.3
+  # - torchtext
+
+  - pip:
+      - --extra-index-url https://download.pytorch.org/whl/nightly/cu124
+      - torch
+      - torchvision
+      - torchaudio
+
+      - nbmerge
+      - ultralytics
+      - seaborn
+      - opencv-python
+      - pyyaml
+      - requests
+
+platforms:
+  - linux-64
