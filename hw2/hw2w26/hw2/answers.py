@@ -255,8 +255,31 @@ Therefore it is possible for both the loss and the accuraacy to decrease.
 part2_q3 = r"""
 **Your answer:**
 
+1. Let's compare the differences and similarities of GD and SGD.
 
+    Similarities:
+    - They operate in a similar way(itertive updates). 
+    - If they converge, it is for a local minimum in non-convex functions, and for a global minimum in convex functions.
+    - Both of them use the gradient of the function to find a minimum.
 
+    Differences:
+    - GD uses the entire dataset to calculate the gradient for one iteration. 
+    SGD uses a mini-batch(by definition it uses 1 sample, but in practice it is typically a mini batch...) instead.
+    - Run time in SGD is faster per iteration.
+    - Convergence rate in SGD is slower as it requires more iterations.
+    - SGD is more noisy, because it is influanced only by the small mini-batch data.
+    - The randomness in SGD can help it get out of local minimum. Therefore GD is more likely to get stuck at a local minimum.
+
+2. Momentum in regular GD might be helpful.
+
+    If there is a big ratio gap between the axes of the data(the loss function surface looks like a narrow valley), then GD will suffer from "zig zag" behavior.
+    Adding momentum will help us converge quickly to the minimum, and bypass the "zig zag".
+
+    In addition to that, adding momentum might help us get out of small local minima.
+    That is a simillar to the behaviour we saw in SGD with momentum. 
+
+3. 
+    
 """
 
 
