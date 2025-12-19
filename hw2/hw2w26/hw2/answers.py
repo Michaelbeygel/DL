@@ -295,10 +295,10 @@ part2_q3 = r"""
     
     And therefore the gradients will be the same.
 
-    2) The problem is that in the forward pass each layer saves the intermidiate activations in the RAM. 
+2) The problem is that in the forward pass each layer saves the intermidiate activations in the RAM. 
     Therefore, altough we split the data we are implicitly saving it in the RAM.
 
-    3) We can solve this issue by automatically calculating the gradient of the batch after the forward pass, and save only that.
+3) We can solve this issue by automatically calculating the gradient of the batch after the forward pass, and save only that.
     The gradients are zeroed before processing the first batch, and parameters are updated only after all batches have been processed.
     Therefore for each batch we would have a single vector of the gradient and that's it. 
     From the answer to part 1 of the current question we could deduce that it would be the same as regular GD.
