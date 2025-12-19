@@ -35,10 +35,20 @@ class Trainer(abc.ABC):
         :param device: torch.device to run training on (CPU or GPU).
         """
         self.model = model
-        self.device = device
+        # self.device = device
 
-        if self.device:
-            model.to(self.device)
+        # if self.device:
+        #     model.to(self.device)
+        # Ensure self.device is a torch.device object
+        if device is None:
+            # Fallback if device is not provided, but it should be provided by cnn_experiment now
+            self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        else:
+            self.device = torch.device(device)
+
+        # Move the model to the trainer's designated device
+        # This is essential to ensure the model's weights are on the correct device
+        self.model.to(self.device) # <--- VERIFY/ADD THIS LINE
 
     def fit(
         self,
@@ -267,9 +277,9 @@ class ClassifierTrainer(Trainer):
 
     def train_batch(self, batch) -> BatchResult:
         X, y = batch
-        if self.device:
-            X = X.to(self.device)
-            y = y.to(self.device)
+
+        X = X.to(self.device)
+        y = y.to(self.device)
 
         self.model: Classifier
         batch_loss: float
@@ -302,9 +312,9 @@ class ClassifierTrainer(Trainer):
 
     def test_batch(self, batch) -> BatchResult:
         X, y = batch
-        if self.device:
-            X = X.to(self.device)
-            y = y.to(self.device)
+
+        X = X.to(self.device)
+        y = y.to(self.device)
 
         self.model: Classifier
         batch_loss: float
@@ -348,6 +358,9 @@ class LayerTrainer(Trainer):
         #    not a tensor) as num_correct.
         # ====== YOUR CODE: ======
         
+        X = X.to(self.device)
+        y = y.to(self.device)
+
         # Flatten the images.
         X = X.reshape(X.shape[0], -1)
         # Zeroing past gradients.
@@ -374,6 +387,9 @@ class LayerTrainer(Trainer):
         # TODO: Evaluate the Layer model on one batch of data.
         # ====== YOUR CODE: ======
         
+        X = X.to(self.device)
+        y = y.to(self.device)
+
         # Flatten the images.
         X = X.reshape(X.shape[0], -1)
         # Predict and get the number of correct predictions

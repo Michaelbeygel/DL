@@ -266,7 +266,7 @@ part2_q3 = r"""
     - GD uses the entire dataset to calculate the gradient for one iteration. 
     SGD uses a mini-batch(by definition it uses 1 sample, but in practice it is typically a mini batch...) instead.
     - Run time in SGD is faster per iteration.
-    - Convergence rate in SGD is slower as it requires more iterations.
+    - SGD requires more iterations to converge.
     - SGD is more noisy, because it is influanced only by the small mini-batch data.
     - The randomness in SGD can help it get out of local minimum. Therefore GD is more likely to get stuck at a local minimum.
 
@@ -279,7 +279,30 @@ part2_q3 = r"""
     That is a simillar to the behaviour we saw in SGD with momentum. 
 
 3. 
+    1) In the original GD algorithm, each iteration updates its parameters in the following way:
+
+    $$w_{(t+1)} = w_{(t)} - \eta \nabla_w L \quad , \text{ where } \quad \nabla_w L = \nabla_w \left( \frac{1}{N} \sum_{i=1}^{N} \ell(y_i, \hat{y}_i) \right) = \frac{1}{N} \sum_{i=1}^{N} \nabla_w \ell(y_i, \hat{y}_i)$$
+
+    Suppose we have a disjoint split of the data $\{N_i\}_{i=1}^{m} \text{ , } N = \left| \bigcup_{i=1}^{m} N_i \right|$.
+
+    In the suggested GD algorithm, each forward pass would calculate:
+    - $\sum_{y \in N_i} \ell(y, \hat{y})$ , the sum of the loss functions for the data in batch $N_i$.
+    - Each layer saves the input data it received, for the backward pass.
     
+    Because $\sum_{i=1}^{N} \ell(y_i, \hat{y}_i) = \sum_{i=1}^{m} \sum_{y \in N_i} \ell(y, \hat{y})$, from the linearity of the gradient we would get that:
+
+    $\nabla_w \sum_{i=1}^{N} \ell(y_i, \hat{y}_i) = \nabla_w \sum_{i=1}^{m} \sum_{y \in N_i} \ell(y, \hat{y})$.
+    
+    And therefore the gradients will be the same.
+
+    2) The problem is that in the forward pass each layer saves the intermidiate activations in the RAM. 
+    Therefore, altough we split the data we are implicitly saving it in the RAM.
+
+    3) We can solve this issue by automatically calculating the gradient of the batch after the forward pass, and save only that.
+    The gradients are zeroed before processing the first batch, and parameters are updated only after all batches have been processed.
+    Therefore for each batch we would have a single vector of the gradient and that's it. 
+    From the answer to part 1 of the current question we could deduce that it would be the same as regular GD.
+
 """
 
 
