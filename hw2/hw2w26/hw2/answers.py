@@ -418,13 +418,40 @@ Therefore we would prefer to optimize the FNR at the cost of increasing FPR.
 part3_q3 = r"""
 **Your answer:**
 
+1. Each column represents a fixed depth.
 
-Write your answer using **markdown** and $\LaTeX$:
-```python
-# A code block
-a = 2
-```
-An equation: $e^{i\pi} -1 = 0$
+    As we can see from the plots, in every column there is a gradual increase in model complexity as the model gain more width.
+As a result, the decision boundaries evolve from simply linear to more complex areas.
+This corresponeds to the Universal Approximation Theorem, which states that there exists a network with a single finite layer that can fit every continuous function "arbitrarily well".
+We see this clearly in the first column(depth=1).
+The performance also increase as the width is getting larger, until a certain point where its starts to decrease as a result of overgitting or optimization problems.
+
+2. Each row represents a fixed width.
+
+    As we can see from the plots, there is not a lot of change in decition boundaries between the different depth in each row.
+In particular, we can notice that the best test accuracy is achieved by:
+    - Row 1 (Width=2): Column 3 (Depth=4)
+    - Row 2 (Width=8): Column 2 (Depth=2)
+    - Row 3 (Width=32): Column 1 (Depth=1)
+
+    This suggest that as the width increase, adding depth does not necessarily improve performance, and might actually hurt it.
+For the 2D "moon" data, a single wide layer is sufficient, and gets the best test accuracy.
+Also, we might get that the optimizer is having problems optimizing the deeper networks(duo to vanishing gradients for example).
+
+3. We got very similar performances between the two models.
+
+    Adding depth to the model, adds sequential non-linear activation functions.
+As a result, altough both of the models have the same number of parameters, the deeper one might represent more complex datasets(note that the hypothesis classes are different). 
+Because the data is not very complex, a single wide layer is sufficient.
+Therefore both models get very similar accuracies, and the shallow one has slightly better generalization.
+
+4. Threshold selection improved the results on the test set.
+
+    As we saw earlier in this part, it help us get a better balance between FPR and FNR, and better performances in general.
+That is duo to better interpretation of the outputs.
+In the model experiment, each model chose a difference threshold, which improved test set resaults.
+Some models chose a threshold as low as 0.12, which is quite far then the standard thresh=0.5.
+
 
 """
 
