@@ -612,13 +612,35 @@ An equation: $e^{i\pi} -1 = 0$
 part6_q1 = r"""
 **Your answer:**
 
+1. The model detection of the objects is bad.
 
-Write your answer using **markdown** and $\LaTeX$:
-```python
-# A code block
-a = 2
-```
-An equation: $e^{i\pi} -1 = 0$
+    In both images, the bounding boxes the model produces where not very good. 
+In the first image, he interpreted only a part of the dolphin as an object - not all of the dolphin.
+In the second image, he didnt produce a bounding box for the real cat.
+
+    The model failed to classify correctly on almost all of the bounding boxes(failed on +80% of the boxes).
+Moreover, he got high confidence in some of these false classification.
+For example, in the first picture he classify the dolphins as humans with confidence of 0.9.
+Which make it hard to rely on such a model.
+
+2. There are several possible reasons for the model failures, one of them is:
+
+    Domain shift. 
+The model might have trained on clean images of dolphins, and not images on dolphins that are facing the sun. 
+Or, it might be even that the training data did not had a dolphin class at all.
+Also, it might have trained on dogs that have more "dogs characteristics" then the provided Shiba Inu dogs(which are a little similar to cats).
+Therefore, because both of the photos are a little unique, it might be that the problems in classifications is duo to a domain shift.
+
+    To resolve this, we should perform fine-tuning.
+We can train the model with a richer dataset that would include pictures of doplhins facing the sun, Shiba Inu dogs, and more unique pictures.
+
+    Another possible way to resolve this issue is data augmantation.
+For example, in the dolphins picture, we might be able to increase lighting such that we could see the skin color of the dolphins.
+Then, the model might identify the dolphins as dolphins and not as humans.
+
+3. A PGD attack on an Object Detection model would itertively insert noise to input images in order to minimize performances.
+This includes minimzing the right class classification confidance, and bounding box selection.
+This will lead to missed detections or confidence misclassifications.
 
 """
 
@@ -627,26 +649,33 @@ part6_q2 = r"""
 **Your answer:**
 
 
-Write your answer using **markdown** and $\LaTeX$:
-```python
-# A code block
-a = 2
-```
-An equation: $e^{i\pi} -1 = 0$
-
 """
 
 
 part6_q3 = r"""
 **Your answer:**
 
+The model failed to detect correctly in all of the 3 attached pictures.
+We will explain the main Object Detection pitfalls the model experienced with each picture.
 
-Write your answer using **markdown** and $\LaTeX$:
-```python
-# A code block
-a = 2
-```
-An equation: $e^{i\pi} -1 = 0$
+Picture 1: Occlusion.
+As we can see, the cat is sitting behind many plants that partially blocks it.
+The model failed therefore to classify the cat correcly, and wrongly detects an apple in the image.
+
+Picture 2: Model Bias.
+The cat is not in its casual setting. It is underwater, and the light is bluish.
+The model was likely trained on images of cats that are not near water, so this represent a domain shift.
+As a resualt, in the given settings, the model is having problems classifying the cat correctly.
+Note that a lot of bears do live near water resources. 
+Therefore it is possible that the trained data contained many pictures of bears with similar characteristics to this pictures(blue tint, watery textures and more..).
+This may explain why the model associated the features with the bear class.
+
+Picture 3: Illumination conditions.
+The cat picture now is overexposed.
+It created two problems for the model:
+1. Texture loss, as the picture is a little blurred and many of the pixels turned into pure white.
+2. The model is probably not trained on overexposed picture. 
+Therefore this picture is out of the original data distribution.
 
 """
 
