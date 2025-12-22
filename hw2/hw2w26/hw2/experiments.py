@@ -11,7 +11,7 @@ from torchvision.datasets import CIFAR10
 
 from cs236781.train_results import FitResult
 
-from .cnn import CNN, ResNet
+from .cnn import CNN, ResNet, YourCNN
 from .mlp import MLP
 from .training import ClassifierTrainer
 from .classifier import ArgMaxClassifier, BinaryClassifier, select_roc_thresh
@@ -22,6 +22,7 @@ MODEL_TYPES = {
     ###
     "cnn": CNN,
     "resnet": ResNet,
+    "yours": YourCNN,
 }
 
 

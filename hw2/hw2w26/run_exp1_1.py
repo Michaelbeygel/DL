@@ -27,11 +27,11 @@ except Exception as e:
 # Common hyperparameters (tunable)
 seed = 42
 bs_train = 128
-batches = 1000
+batches = 500
 epochs = 50
 early_stopping = 5
-pool_every = 4
-hidden_dims = [100]
+pool_every = 3
+hidden_dims = [512]
 lr = 1e-3  # learning rate
 reg = 1e-3  # regularization
 model_type = 'cnn'  # as in notebook
@@ -42,7 +42,7 @@ def run_configs():
     for K in ([32], [64]):
         k_val = K[0]
         for L in [2, 4, 8, 16]:
-            run_name = f"exp1_1_L{L}_K{k_val}"
+            run_name = "exp1_1"
             print(f"\n=== Running {run_name} ===")
             cfg = dict(
                 run_name=run_name,

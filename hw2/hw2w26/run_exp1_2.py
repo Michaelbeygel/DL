@@ -29,8 +29,8 @@ bs_train = 128
 batches = 500
 epochs = 50
 early_stopping = 5
-pool_every = 2
-hidden_dims = [100]
+pool_every = 3
+hidden_dims = [512]
 lr = 1e-3  # learning rate
 reg = 1e-3  # regularization
 model_type = 'cnn'  # choose 'cnn' or 'resnet'
@@ -40,7 +40,7 @@ results = []
 def run_configs():
     for L in [2, 4, 8]:
         for K in [32, 64, 128]:
-            run_name = f"exp1_2_L{L}_K{K}"
+            run_name = "exp1_2"
             print(f"\n=== Running {run_name} ===")
             cfg = dict(
                 run_name=run_name,

@@ -551,41 +551,66 @@ For residual layers ($y = x + M x$), the gradient is $(I + M)^\top \frac{\partia
 
 
 part5_q1 = r"""
-**Your answer:**
+### 1. Analysis of the Effect of Depth ($L$)
+In this experiment, we observed that increasing the depth of a **plain** CNN (without skip connections) does not linearly improve performance.
 
+* **Optimal Depth:** Typically, the best results are achieved with value of $L$ (e.g., $L=2$ or $L=4$). At these depths, the network has enough capacity to learn meaningful hierarchical features from the CIFAR-10 dataset while remaining shallow enough for the gradient to flow effectively from the output back to the input layers.
+* **Performance Degradation:** As $L$ increases to 8 and 16, the network's accuracy begins to drop. Even though a deeper model has more parameters and theoretically higher representational capacity, the difficulty of optimizing a deep "plain" stack outweighs the benefits of the added layers.
 
-Write your answer using **markdown** and $\LaTeX$:
-```python
-# A code block
-a = 2
-```
-An equation: $e^{i\pi} -1 = 0$
+### 2. Non-trainable values of $L$ and the Vanishing Gradient
+We observed that for higher values of $L$ (specifically $L=8$ and $L=16$), the network often became **untrainable**. This was characterized by flat-line accuracy (near 10%) and loss curves that did not decrease, eventually triggering **early stopping**.
 
+**The Cause: Vanishing Gradients**
+In a plain CNN, the gradient is computed using the chain rule. During backpropagation, the error signal is multiplied by the weights and the derivatives of the activation functions at every layer. 
+$$ \frac{\partial \mathcal{L}}{\partial \mathbf{W}_1} = \frac{\partial \mathcal{L}}{\partial \mathbf{y}} \cdot \frac{\partial \mathbf{y}}{\partial \mathbf{h}_L} \dots \frac{\partial \mathbf{h}_2}{\partial \mathbf{h}_1} \cdot \frac{\partial \mathbf{h}_1}{\partial \mathbf{W}_1} $$
+If these intermediate derivatives are small (which is common with standard initialization), multiplying them 8 or 16 times causes the gradient to decay exponentially until it vanishes. The early layers receive no update, so the model never learns to extract basic features.
+
+**Suggested Resolutions:**
+1.  **Residual Connections (Skip Connections):** Introduce "shortcuts" that allow the gradient to bypass layers. By changing the layer to $y = F(x) + x$, the gradient can flow through the identity path ($+1$ in the derivative), ensuring it stays strong even at $L=16$.
+    
+2.  **Batch Normalization:** Adding Batchnorm layers after convolutions helps keep the activations in a range where the derivatives (e.g., of a ReLU or Tanh) are less likely to vanish or saturate, stabilizing the distribution of inputs to deeper layers and allowing for higher learning rates.
 """
 
 part5_q2 = r"""
-**Your answer:**
 
+### Analysis of Experiment 1.2: Filter Width ($K$) vs. Depth ($L$)
 
-Write your answer using **markdown** and $\LaTeX$:
-```python
-# A code block
-a = 2
-```
-An equation: $e^{i\pi} -1 = 0$
+In this experiment, we investigated how the number of filters ($K$) affects performance across different depths. Our results show that while width can influence the outcome, it is secondary to the impact of the network's depth.
 
+#### 1. Case $L=2$: The Optimal Depth
+At $L=2$, the network achieved its best overall performance, but we observed that **increasing $K$ does not necessarily lead to better results.**
+* **Observation:** The results for $K=32, 64, 128$ were relatively similar, with $K=64$ performing best and $K=128$ actually showing a slight decrease in performance compared to $K=32$.
+* **Analysis:** This suggests that for a shallow, well-optimized depth like $L=2$, a moderate number of filters (like 64) is sufficient to capture the necessary features for CIFAR-10. Increasing $K$ to 128 adds more parameters but does not provide additional discriminative power; it may even lead to slight overfitting or optimization noise, resulting in the "worse" performance observed for the largest $K$.
+
+#### 2. Case $L=4$: The "Shallow" Performance
+At $L=4$, the network performed worse than the $L=2$ configurations regardless of the value of $K$.
+* **Analysis:** Although $L=4$ has more layers, the accuracy was lower than in the $L=2$ runs. This indicates that even with only 4 layers per block, the plain CNN architecture already starts to face optimization difficulties that hinder its ability to leverage its representational capacity. The extra width ($K$) in these models could not overcome the performance drop caused by the increased depth.
+
+#### 3. Case $L=8$: The Total Failure
+For $L=8$, the model remained untrainable across all values of $K$, staying at a random-guessing accuracy ($\approx 10\%$).
+* **Analysis:** This confirms that **width is irrelevant when the depth causes gradients to vanish.** No matter how many filters are available, if the error signal cannot propagate back through the 8-layer plain stack to update the weights, the model cannot learn.
+
+### Comparison to Experiment 1.1
+Comparing these results to Experiment 1.1 highlights a key takeaway: **Depth ($L$) is the primary bottleneck.** 1. **Depth defines the ceiling:** $L=2$ was the optimal depth for this plain architecture. 
+2. **Width provides diminishing returns:** Once a stable depth is chosen, increasing $K$ provides limited benefits and eventually hits a point of diminishing returns (as seen in the $L=2, K=128$ case). 
+3. **Width cannot fix Depth:** The failure of $L=8$ across all $K$ values proves that architectural width cannot compensate for the lack of skip connections (ResNet) in deep networks.
 """
 
 part5_q3 = r"""
-**Your answer:**
 
+### Analysis of Experiment 1.3: Depth in Multi-Block Architectures
 
-Write your answer using **markdown** and $\LaTeX$:
-```python
-# A code block
-a = 2
-```
-An equation: $e^{i\pi} -1 = 0$
+In Experiment 1.3, we used a three-block architecture with a filter progression of $K=[64, 128, 256]$ and varied the layers per block ($L=2, 3, 4$). 
+
+#### 1. Effect of Depth on Accuracy
+The results show a sharp decline in performance as the total depth increases:
+* **L=2 (Total 6 Layers):** This configuration achieved the highest accuracy in this set. It manages to balance the increased capacity of the multi-block filter progression with a depth that is still (barely) optimizable for a plain CNN.
+* **L=3 and L=4 (Total 9 and 12 Layers):** We observed a significant drop in accuracy. In the case of $L=4$, the model likely failed to train completely, with accuracy remaining near $10\%$. This mirrors the failure seen in Experiment 1.1 for $L=8$.
+
+#### 2. Vanishing Gradient and Plain Architectures
+This experiment further proves the limitations of **plain convolutional stacks**. 
+* As we increase $L$, we increase the number of multiplications in the backpropagation chain. For 9 or 12 layers, the gradient of the loss with respect to the initial weights ($K=64$ block) becomes effectively zero.
+* Even though we are using a standard "feature pyramid" (increasing $K$ while decreasing spatial resolution), the **depth bottleneck** prevents the network from learning. The capacity provided by the $K=256$ layers is wasted because the earlier layers never converge on meaningful feature extractors.
 
 """
 

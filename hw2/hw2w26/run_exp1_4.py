@@ -24,7 +24,8 @@ bs_train = 128
 batches = 500
 epochs = 50
 early_stopping = 5
-hidden_dims = [100]
+pool_every = 3
+hidden_dims = [512]
 lr = 1e-3
 reg = 1e-3
 model_type = 'resnet'
@@ -35,12 +36,7 @@ def run_configs():
     # --- Part 1: K=[32], L in [8, 16, 32] ---
     K1 = [32]
     for L in [8, 16, 32]:
-        # P is adjusted to prevent spatial dimensions from hitting 0
-        if L == 32: pool_every = 16
-        elif L == 16: pool_every = 8
-        else: pool_every = 4
-        
-        run_name = f"exp1_4_L{L}_K{'-'.join(map(str, K1))}"
+        run_name = "exp1_4"
         print(f"\n=== Running {run_name} ===")
         
         cfg = dict(
@@ -50,6 +46,7 @@ def run_configs():
             batches=batches,
             epochs=epochs,
             early_stopping=early_stopping,
+            pool_every=pool_every,
             filters_per_layer=K1,
             layers_per_block=L,
             pool_every=pool_every,

@@ -1,16 +1,11 @@
-"""Run Experiment 1.3 from Part5_CNN_Experiments.ipynb
+"""Run Experiment 2 from Part5_CNN_Experiments.ipynb
 
-This script runs the configurations described in the notebook:
-- K=[64,128,256] fixed with L=2,3,4 varying per run.
-
-It calls `hw2.experiments.cnn_experiment` for each configuration and
-saves results in the `results/` folder (as the notebook expects).
+This script runs the custom 'YourCNN' configurations:
+- Comparing different widths K=[32, 64, 128] 
+- Using the optimal depth L discovered in Exp 1 (typically L=2 or L=4)
 
 Usage (from workspace root):
-    python run_exp1_3.py
-
-Note: Training can be long; these are the configurations to run. Adjust
-`batches`/`epochs`/`bs_train` as needed for quicker tests.
+    python run_exp2.py
 """
 
 import os
@@ -23,25 +18,33 @@ except Exception as e:
     print("Failed to import hw2.experiments.cnn_experiment:", e)
     raise
 
-# Common hyperparameters (tunable)
+# Common hyperparameters based on previous recommendations
 seed = 42
 bs_train = 128
-batches = 500
+batches = 400     # Ensures over 30,000 images (400 * 128 = 51,200)
 epochs = 50
 early_stopping = 5
 pool_every = 3
 hidden_dims = [512]
-lr = 1e-3  # learning rate
-reg = 1e-3  # regularization
-model_type = 'cnn'  # choose 'cnn' or 'resnet'
+lr = 1e-3
+reg = 1e-3
+model_type = 'yours' # Ensure this matches your YourCNN mapping in MODEL_TYPES
 
 results = []
 
 def run_configs():
-    K = [64, 128, 256]
-    for L in [2, 3, 4]:
-        run_name = "exp1_3"
-        print(f"\n=== Running {run_name} ===")
+    # --- Experiment 2: Testing YourCNN with varying widths ---
+    # We use L=2 as the base because it was the most stable in Exp 1.1
+    L = 2
+    
+    for K_val in [32, 64, 128]:
+        K = [K_val]
+        
+        # Following your preferred clean naming convention for the legend
+        run_name = "exp2" 
+        
+        print(f"\n=== Running {run_name} with L={L}, K={K_val} ===")
+        
         cfg = dict(
             run_name=run_name,
             seed=seed,
@@ -57,6 +60,7 @@ def run_configs():
             lr=lr,
             reg=reg,
         )
+        
         start = time.time()
         try:
             cnn_experiment(**cfg)
@@ -64,13 +68,13 @@ def run_configs():
         except Exception as e:
             print(f"Run {run_name} failed: {e}")
             status = f'error: {e}'
+        
         duration = time.time() - start
-        results.append((run_name, status, duration))
-        print(f"Finished {run_name}: {status} ({duration:.1f}s)")
+        results.append((f"{run_name}_L{L}_K{K_val}", status, duration))
+        print(f"Finished {run_name}_L{L}_K{K_val}: {status} ({duration:.1f}s)")
 
 if __name__ == '__main__':
     os.makedirs('results', exist_ok=True)
     run_configs()
-    print('\nSummary:')
+    print('\nSummary of Experiment 2:')
     pprint(results)
-    print('\nNote: adjust `batches`/`epochs`/`bs_train` in this script for faster testing.')
