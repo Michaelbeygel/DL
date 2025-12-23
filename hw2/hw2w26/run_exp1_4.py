@@ -24,7 +24,7 @@ bs_train = 128
 batches = 500
 epochs = 50
 early_stopping = 5
-pool_ever = 3
+pool_every_ = 3
 hidden_dims = [512]
 lr = 1e-3
 reg = 1e-3
@@ -46,7 +46,7 @@ def run_configs():
             batches=batches,
             epochs=epochs,
             early_stopping=early_stopping,
-            pool_every=pool_ever,
+            pool_every=pool_every_,
             filters_per_layer=K1,
             layers_per_block=L,
             hidden_dims=hidden_dims,
