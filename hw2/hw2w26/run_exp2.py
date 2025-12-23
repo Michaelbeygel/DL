@@ -22,10 +22,10 @@ except Exception as e:
 seed = 42
 bs_train = 128
 batches = 400     # Ensures over 30,000 images (400 * 128 = 51,200)
-epochs = 50
+epochs = 30
 early_stopping = 5
 pool_every = 3
-hidden_dims = [512]
+hidden_dims = [256]
 lr = 1e-3
 reg = 1e-3
 model_type = 'yours' # Ensure this matches your YourCNN mapping in MODEL_TYPES

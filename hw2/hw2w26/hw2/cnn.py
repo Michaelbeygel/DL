@@ -454,45 +454,6 @@ class YourCNN(CNN):
         P = self.pool_every
         N = len(self.channels)
 
-        # We wrap groups of P convolutions into Residual Blocks
-        for i in range(0, N, P):
-            group_channels = self.channels[i : i + P]
-            num_in_group = len(group_channels)
-            
-            # Using 3x3 kernels for standard feature extraction
-            group_kernels = [3] * num_in_group
-            
-            # 1. Add a Residual Block (handles Conv -> BN -> Act -> Dropout -> Skip)
-            layers.append(
-                ResidualBlock(
-                    in_channels=curr_in_channels,
-                    channels=group_channels,
-                    kernel_sizes=group_kernels,
-                    batchnorm=True,        # CRITICAL: Overcomes vanishing gradients
-                    dropout=0.1,           # Slight dropout for regularization
-                    activation_type=self.activation_type,
-                    activation_params=self.activation_params
-                )
-            )
-            
-            curr_in_channels = group_channels[-1]
-
-            # 2. Add Pooling to reduce spatial dimensions
-            if (i + P) <= N:
-                PoolingLayer = {"max": nn.MaxPool2d, "avg": nn.AvgPool2d}[self.pooling_type]
-                layers.append(PoolingLayer(**self.pooling_params))
-
-        return nn.Sequential(*layers)
-
-
-    def _make_feature_extractor(self):
-        in_channels, in_h, in_w = tuple(self.in_size)
-        layers = []
-        
-        curr_in_channels = in_channels
-        P = self.pool_every
-        N = len(self.channels)
-
         # Set default pooling params if the dict is empty
         p_params = self.pooling_params if self.pooling_params else {"kernel_size": 2}
 
@@ -507,7 +468,7 @@ class YourCNN(CNN):
                     channels=group_channels,
                     kernel_sizes=group_kernels,
                     batchnorm=True,
-                    dropout=0.1,
+                    dropout=0.2,
                     activation_type=self.activation_type,
                     activation_params=self.activation_params
                 )

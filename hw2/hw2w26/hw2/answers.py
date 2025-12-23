@@ -554,7 +554,7 @@ part5_q1 = r"""
 ### 1. Analysis of the Effect of Depth ($L$)
 In this experiment, we observed that increasing the depth of a **plain** CNN (without skip connections) does not linearly improve performance.
 
-* **Optimal Depth:** Typically, the best results are achieved with value of $L$ (e.g., $L=2$ or $L=4$). At these depths, the network has enough capacity to learn meaningful hierarchical features from the CIFAR-10 dataset while remaining shallow enough for the gradient to flow effectively from the output back to the input layers.
+* **Optimal Depth:** Typically, the best results are achieved with value of $L=4$. At these depth, the network has enough capacity to learn meaningful hierarchical features from the CIFAR-10 dataset while remaining shallow enough for the gradient to flow effectively from the output back to the input layers.
 * **Performance Degradation:** As $L$ increases to 8 and 16, the network's accuracy begins to drop. Even though a deeper model has more parameters and theoretically higher representational capacity, the difficulty of optimizing a deep "plain" stack outweighs the benefits of the added layers.
 
 ### 2. Non-trainable values of $L$ and the Vanishing Gradient
@@ -562,8 +562,7 @@ We observed that for higher values of $L$ (specifically $L=8$ and $L=16$), the n
 
 **The Cause: Vanishing Gradients**
 In a plain CNN, the gradient is computed using the chain rule. During backpropagation, the error signal is multiplied by the weights and the derivatives of the activation functions at every layer. 
-$$ \frac{\partial \mathcal{L}}{\partial \mathbf{W}_1} = \frac{\partial \mathcal{L}}{\partial \mathbf{y}} \cdot \frac{\partial \mathbf{y}}{\partial \mathbf{h}_L} \dots \frac{\partial \mathbf{h}_2}{\partial \mathbf{h}_1} \cdot \frac{\partial \mathbf{h}_1}{\partial \mathbf{W}_1} $$
-If these intermediate derivatives are small (which is common with standard initialization), multiplying them 8 or 16 times causes the gradient to decay exponentially until it vanishes. The early layers receive no update, so the model never learns to extract basic features.
+If intermediate derivatives are small (which is common with standard initialization), multiplying them 8 or 16 times causes the gradient to decay exponentially until it vanishes. The early layers receive no update, so the model never learns to extract basic features.
 
 **Suggested Resolutions:**
 1.  **Residual Connections (Skip Connections):** Introduce "shortcuts" that allow the gradient to bypass layers. By changing the layer to $y = F(x) + x$, the gradient can flow through the identity path ($+1$ in the derivative), ensuring it stays strong even at $L=16$.
@@ -575,25 +574,27 @@ part5_q2 = r"""
 
 ### Analysis of Experiment 1.2: Filter Width ($K$) vs. Depth ($L$)
 
-In this experiment, we investigated how the number of filters ($K$) affects performance across different depths. Our results show that while width can influence the outcome, it is secondary to the impact of the network's depth.
+#### 1. Case $L=2$:
+* The network is shallow enough to converge across all tested filter widths $K$, but we observe that **smaller filter counts ($K=32$) generalize better in this configuration.
+* **U-Shape Loss:** The test loss exhibits a distinct **U-shape**, reaching a minimum before rising. This indicates that as training continues, the added complexity of 64 or 128 filters introduces more parameters than the architecture can effectively regularize, causing the model to move past the point of optimal generalization.
+* **Overfitting:** Significant overfitting is evident as training accuracy approaches $90\%$ while test accuracy plateaus much lower, creating a visible generalization gap.
 
-#### 1. Case $L=2$: The Optimal Depth
-At $L=2$, the network achieved its best overall performance, but we observed that **increasing $K$ does not necessarily lead to better results.**
-* **Observation:** The results for $K=32, 64, 128$ were relatively similar, with $K=64$ performing best and $K=128$ actually showing a slight decrease in performance compared to $K=32$.
-* **Analysis:** This suggests that for a shallow, well-optimized depth like $L=2$, a moderate number of filters (like 64) is sufficient to capture the necessary features for CIFAR-10. Increasing $K$ to 128 adds more parameters but does not provide additional discriminative power; it may even lead to slight overfitting or optimization noise, resulting in the "worse" performance observed for the largest $K$.
+#### 2. Case $L=4$:
+At $L=4$, the relationship between width and performance flips; the network now requires more filters to reach its peak potential, though overfitting becomes even more pronounced.
+* $K=64$ and $K=128$ outperformed $K=32$ in test accuracy.
+* With 4 layers, the model has enough architectural depth to benefit from a higher number of features ($K=64, 128$). However, without regularization, the model uses its increased capacity to memorize the training set rather than generalizing.
+* **U-Shape Loss:** A very sharp **U-shape** is visible in the test loss for all $K$ values. The loss drops quickly but rebounds aggressively after approximately iteration 7. This confirms that higher capacity leads to faster divergence once the training set is memorized.
+* **Overfitting:** We observe extreme overfitting across all values of $K$. For $K=128$, training accuracy reaches nearly $100\%$, yet test accuracy remains around $70\%$, resulting in a massive generalization gap.
 
-#### 2. Case $L=4$: The "Shallow" Performance
-At $L=4$, the network performed worse than the $L=2$ configurations regardless of the value of $K$.
-* **Analysis:** Although $L=4$ has more layers, the accuracy was lower than in the $L=2$ runs. This indicates that even with only 4 layers per block, the plain CNN architecture already starts to face optimization difficulties that hinder its ability to leverage its representational capacity. The extra width ($K$) in these models could not overcome the performance drop caused by the increased depth.
-
-#### 3. Case $L=8$: The Total Failure
-For $L=8$, the model remained untrainable across all values of $K$, staying at a random-guessing accuracy ($\approx 10\%$).
-* **Analysis:** This confirms that **width is irrelevant when the depth causes gradients to vanish.** No matter how many filters are available, if the error signal cannot propagate back through the 8-layer plain stack to update the weights, the model cannot learn.
+#### 3. Case $L=8$:
+* All configurations ($K=32, 64, 128$) remained stuck at $\approx 10\%$ accuracy.
+* This confirms that **width is irrelevant when depth creates an optimization barrier.** In a plain CNN architecture without skip connections or normalization, the vanishing gradient problem prevents any learning from occurring at $L=8$, rendering the number of filters $K$ moot.
 
 ### Comparison to Experiment 1.1
-Comparing these results to Experiment 1.1 highlights a key takeaway: **Depth ($L$) is the primary bottleneck.** 1. **Depth defines the ceiling:** $L=2$ was the optimal depth for this plain architecture. 
-2. **Width provides diminishing returns:** Once a stable depth is chosen, increasing $K$ provides limited benefits and eventually hits a point of diminishing returns (as seen in the $L=2, K=128$ case). 
-3. **Width cannot fix Depth:** The failure of $L=8$ across all $K$ values proves that architectural width cannot compensate for the lack of skip connections (ResNet) in deep networks.
+Comparing these results to Experiment 1.1 highlights how width and depth interact:
+1. **Depth is the primary constraint:** Just as in Experiment 1.1, increasing depth beyond a certain point ($L=8$) leads to total failure that no amount of width ($K$) can fix.
+2. Experiment 1.2 shows that the "best" $K$ depends on depth—$K=32$ was best for $L=2$, but $K=64$ was required to maximize the potential of $L=4$.
+3. While Experiment 1.1 focused on the depth-limit, Experiment 1.2 shows that even at stable depths, adding width ($K=128$) or depth ($L=4$) accelerates overfitting, leading to high training accuracy but stagnant or degrading test performance due to the lack of regularization.
 """
 
 part5_q3 = r"""
