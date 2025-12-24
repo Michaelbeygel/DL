@@ -48,7 +48,8 @@ class Trainer(abc.ABC):
 
         # Move the model to the trainer's designated device
         # This is essential to ensure the model's weights are on the correct device
-        self.model.to(self.device) # <--- VERIFY/ADD THIS LINE
+        if hasattr(self.model, "to"):
+            self.model.to(self.device)
 
     def fit(
         self,
