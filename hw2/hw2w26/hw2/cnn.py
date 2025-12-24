@@ -455,7 +455,7 @@ class YourCNN(CNN):
         N = len(self.channels)
 
         # Set default pooling params if the dict is empty
-        p_params = self.pooling_params if self.pooling_params else {"kernel_size": 2}
+        p_params = self.pooling_params if self.pooling_params else {"kernel_size": 3}
 
         for i in range(0, N, P):
             group_channels = self.channels[i : i + P]
@@ -468,7 +468,7 @@ class YourCNN(CNN):
                     channels=group_channels,
                     kernel_sizes=group_kernels,
                     batchnorm=True,
-                    dropout=0.2,
+                    dropout=0.5,
                     activation_type=self.activation_type,
                     activation_params=self.activation_params
                 )

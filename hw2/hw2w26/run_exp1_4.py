@@ -73,7 +73,7 @@ def run_configs():
         # P=L ensures one pool after each filter stage
         pool_every = L
         
-        run_name = f"exp1_4_L{L}_K{'-'.join(map(str, K2))}"
+        run_name = "exp1_4"
         print(f"\n=== Running {run_name} ===")
         
         cfg = dict(

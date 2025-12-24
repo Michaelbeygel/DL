@@ -19,28 +19,14 @@ The total number of elements in $\mat{Y}$ is $N \times D_{\text{out}} = 64 \time
 
 The shape of the full Jacobian $\frac{\partial \mat{Y}}{\partial \mat{X}}$ is:
 
-$$(N \times D_{\text{out}}) \times (N \times D_{\text{in}}) = (32,768) \times (65,536) = 2,147,483,648$$
-
-
-<font color='red'>**- Boaz notes:**</font>
-(The question is about the shape, not the size.) 
-
-By simple calculations we would get that:
-
-The size of $\mat{X}$ is $64 \times 1024$.
-
-The size of $\mat{Y}$ is $64 \times 512$.
-
-The jacobian tensor would have to take into account the partial deriviative of each two elements from $\mat{X}$ and $\mat{Y}$.
-
-Therefore the shape of the jacobian tensor will be $(64 \times 512 \times 64 \times 1024)$.
+$$(N \times D_{\text{out}}) \times (N \times D_{\text{in}}) = (32,768) \times (65,536)$$
 
 **1.2 Block Matrix Structure:**
 
 When viewed as a block matrix with blocks of shape $(D_{\text{out}} \times D_{\text{in}}) = (512 \times 1024)$:
 
 The Jacobian is a **diagonal block matrix**. The structure is:
-- **Diagonal blocks** (where $i = j$): Each diagonal block equals $\mat{W}^T$ because sample $i$'s output depends only on sample $i$'s input <font color='red'> s.t : $Y_i = X_iW^T$ </font>
+- **Diagonal blocks** (where $i = j$): Each diagonal block equals $\mat{W}^T$ because sample $i$'s output depends only on sample $i$'s input $\text{s.t. } y_i = x_i W^T$
 - **Off-diagonal blocks** (where $i \neq j$): All zeros, because the output of sample $i$ is independent of the input of sample $j$
 
 **1.3 Optimization:**
@@ -49,13 +35,8 @@ Because the Jacobian is a diagonal block matrix whose diagonal blocks are all id
 
 - **Optimized storage:** one copy of the weight matrix $\mat{W}$ (or $\mat{W}^\top$) with shape $(512) \times (1024)$.
 
-This reduces storage from the full Jacobian size of $(32,768)\times(65,536)$ elements down to $512\times1024 = 524{,}288$ elements.
-
-<font color='red'>**Boaz notes:**
-
 This reduces storage from the full Jacobian of shape $(64 \times 512 \times 64 \times 1024)$  down to $(512\times1024)$, which is $64^2$ times smaller.
 
-</font>
 
 **1.4 Computing Gradient Without Materializing Jacobian:**
 Given $\delta\mathbf{Y}\in\mathbb{R}^{N\times512}$, compute per-sample
@@ -96,7 +77,7 @@ $$
 (D_{\mathrm{out}}\times D_{\mathrm{in}}) = (512\times 1024).
 $$
 
-Brief explanation: For a single sample $i$ and output unit $p$ we have
+Explanation: For a single sample $i$ and output unit $p$ we have
 $y_{i,p}=\sum_r W_{p,r}x_{i,r}$, so differentiating w.r.t. the $p$-th row of
 $W$ yields the input row $x^{(i)}$. Thus each output's derivative places
 the vector $x^{(i)}$ in the corresponding output-row, producing blocks of
@@ -599,33 +580,43 @@ Comparing these results to Experiment 1.1 highlights how width and depth interac
 
 part5_q3 = r"""
 
-### Analysis of Experiment 1.3: Depth in Multi-Block Architectures
+### Analysis of Experiment 1.3: Multi-Stage Filter Width ($K=[64, 128]$) vs. Depth ($L$)
 
-In Experiment 1.3, we used a three-block architecture with a filter progression of $K=[64, 128, 256]$ and varied the layers per block ($L=2, 3, 4$). 
+#### 1. Case $L=2$ and $L=3$:
+Both the $L=2$ and $L=3$ configurations successfully converged, as the network depth was shallow enough for the gradient to propagate effectively despite the increased width.
+* Both models achieved high performance, with $L=2$ performing slightly better, peaking at approximately $73-74\%$ test accuracy, while $L=3$ reached approximately $69-70\%$.
+* Both configurations exhibit significant overfitting, characterized by a large gap between training accuracy (approaching $100\%$) and test accuracy.
+* A clear **U-shape** is visible in the test loss for both runs; the loss reaches a minimum before rebounding upward.
+* This confirms that as the model exhausts its ability to generalize, it uses its high filter capacity to memorize the training set, causing the test performance to degrade. While $L=3$ provides more parameters, the optimization difficulty of the extra layer results in slightly lower accuracy than the $L=2$ baseline.
 
-#### 1. Effect of Depth on Accuracy
-The results show a sharp decline in performance as the total depth increases:
-* **L=2 (Total 6 Layers):** This configuration achieved the highest accuracy in this set. It manages to balance the increased capacity of the multi-block filter progression with a depth that is still (barely) optimizable for a plain CNN.
-* **L=3 and L=4 (Total 9 and 12 Layers):** We observed a significant drop in accuracy. In the case of $L=4$, the model likely failed to train completely, with accuracy remaining near $10\%$. This mirrors the failure seen in Experiment 1.1 for $L=8$.
-
-#### 2. Vanishing Gradient and Plain Architectures
-This experiment further proves the limitations of **plain convolutional stacks**. 
-* As we increase $L$, we increase the number of multiplications in the backpropagation chain. For 9 or 12 layers, the gradient of the loss with respect to the initial weights ($K=64$ block) becomes effectively zero.
-* Even though we are using a standard "feature pyramid" (increasing $K$ while decreasing spatial resolution), the **depth bottleneck** prevents the network from learning. The capacity provided by the $K=256$ layers is wasted because the earlier layers never converge on meaningful feature extractors.
+#### 2. Case $L=4$:
+At $L=4$, the multi-stage architecture suffers a total training failure, highlighting the critical trade-off between filter width and network depth.
+* Both training and test accuracy flatline at exactly $10\%$, and the training loss remains stagnant near $2.30$.
+* This result demonstrates that **increasing the width incrementally ($64 \to 128$) cannot compensate for excessive depth** in a plain CNN architecture.
+* Even though $L=4$ was trainable with narrower filters in previous runs, the added complexity of wider filters at this depth triggers an earlier optimization collapse. The gradients fail to propagate through the (K*L)=8-layer wide stack.
 
 """
 
 part5_q4 = r"""
-**Your answer:**
 
+### Analysis of Experiment 1.4: The Impact of Skip Connections
 
-Write your answer using **markdown** and $\LaTeX$:
-```python
-# A code block
-a = 2
-```
-An equation: $e^{i\pi} -1 = 0$
+In this experiment, we introduced skip connections (Residual connections) to resolve the optimization bottlenecks identified in previous experiments.
 
+#### 1. Overcoming the "Depth Wall"
+The most significant result is the successful training of deep architectures that previously suffered from total optimization collapse.
+* **High Depth Training:** Unlike Experiment 1.1 and 1.3, where models reached a "wall" and resulted in stagnant $10\%$ accuracy, the Residual networks with $L=8$, $L=16$, and $L=32$ converged effectively.
+* **Gradient Stability:** Skip connections allow the gradient to bypass weight layers through the identity path $H(x) = F(x) + x$. This ensures that even at $L=16$ or $L=32$, the error signal remains strong enough to update early layers, preventing the vanishing gradient problem seen in plain stacks.
+
+#### 2. Width and Depth Sensitivity
+* **Comparison to Experiment 1.1:** In Experiment 1.1 ($K=32$ or $K=64$), the "depth wall" was hit at $L=8$. In Experiment 1.4, even with $K=32$ and a much higher depth of $L=16$ or $L=32$, the model trains successfully, achieving test accuracy around $77-78\%$.
+* **Comparison to Experiment 1.3:** In Experiment 1.3 ($K=[64, 128]$), the increased width caused the "depth wall" to appear earlier, at $L=4$, due to increased optimization complexity. However, Experiment 1.4 shows that skip connections stabilize these wide configurations, allowing the $L=8, K=[64, 128, 256]$ model to train perfectly and reach approximately $80\%$ accuracy.
+* **Analysis:** This proves that while increasing width ($K$) makes a plain network more fragile at lower depths, skip connections remove this constraint entirely, allowing the model to scale in both dimensions simultaneously.
+
+#### 3. Performance and the U-Shape
+* **Accuracy Ceiling:** The Residual models achieved the highest test accuracy in the study ($\approx 80\%$), significantly outperforming the best plain models ($\approx 74\%$).
+* **U-Shape Loss:** A sharp **U-shape** is still visible in the test loss for most runs, particularly the deeper and wider ones. Because skip connections enable the model to reach near $100\%$ training accuracy, the model eventually begins to memorize the training data, leading to test loss divergence.
+* **Conclusion:** Skip connections solve the **trainability** issue (the "wall"), but the models still suffer from **overfitting**, indicating that while depth is no longer a barrier to learning, regularization remains necessary to maintain generalization.
 """
 
 
