@@ -468,7 +468,7 @@ class YourCNN(CNN):
                     channels=group_channels,
                     kernel_sizes=group_kernels,
                     batchnorm=True,
-                    dropout=0.5,
+                    dropout=0.2,
                     activation_type=self.activation_type,
                     activation_params=self.activation_params
                 )
