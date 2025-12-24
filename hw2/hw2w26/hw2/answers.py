@@ -601,24 +601,27 @@ part5_q4 = r"""
 
 ### Analysis of Experiment 1.4: The Impact of Skip Connections
 
-In this experiment, we introduced skip connections (Residual connections) to resolve the optimization bottlenecks identified in previous experiments.
+In this experiment, we introduced skip connections (Residual connections) to resolve the optimization bottlenecks identified in previous experiments. These results clearly demonstrate that skip connections are the primary driver for training deeper networks effectively.
 
-#### 1. Overcoming the "Depth Wall"
-The most significant result is the successful training of deep architectures that previously suffered from total optimization collapse.
-* **High Depth Training:** Unlike Experiment 1.1 and 1.3, where models reached a "wall" and resulted in stagnant $10\%$ accuracy, the Residual networks with $L=8$, $L=16$, and $L=32$ converged effectively.
-* **Gradient Stability:** Skip connections allow the gradient to bypass weight layers through the identity path $H(x) = F(x) + x$. This ensures that even at $L=16$ or $L=32$, the error signal remains strong enough to update early layers, preventing the vanishing gradient problem seen in plain stacks.
+The most significant result is the successful training of deep architectures that previously suffered from total optimization collapse in Experiments 1.1 and 1.3.
+* **Overcoming Vanishing Gradients:** Unlike plain CNNs, where $L \ge 8$ resulted in stagnant $10\%$ accuracy, the Residual networks with $L=8, 16, \text{and } 32$ converged successfully.
+* **Identity Mapping:** Skip connections allow the gradient to bypass weight layers through the identity path $H(x) = F(x) + x$. This ensures that the error signal remains strong enough to update early layers even at extreme depths like $L=32$.
 
-#### 2. Width and Depth Sensitivity
-* **Comparison to Experiment 1.1:** In Experiment 1.1 ($K=32$ or $K=64$), the "depth wall" was hit at $L=8$. In Experiment 1.4, even with $K=32$ and a much higher depth of $L=16$ or $L=32$, the model trains successfully, achieving test accuracy around $77-78\%$.
-* **Comparison to Experiment 1.3:** In Experiment 1.3 ($K=[64, 128]$), the increased width caused the "depth wall" to appear earlier, at $L=4$, due to increased optimization complexity. However, Experiment 1.4 shows that skip connections stabilize these wide configurations, allowing the $L=8, K=[64, 128, 256]$ model to train perfectly and reach approximately $80\%$ accuracy.
-* **Analysis:** This proves that while increasing width ($K$) makes a plain network more fragile at lower depths, skip connections remove this constraint entirely, allowing the model to scale in both dimensions simultaneously.
+#### 1. Case $K=32$ ($L=8, 16, 32$):
+* **The Benefit of Depth:** With skip connections, we see that $L=16$ (blue) achieves high test accuracy ($\approx 77\%$), outperforming the best results from Experiment 1.1.
+* **Diminishing Returns:** Interestingly, the $L=32$ model (orange) performs worse than $L=16$, plateauing around $68\%$ test accuracy. This suggests that while skip connections solve trainability, very deep plain-residual stacks may still struggle with generalization or require additional stabilization like Batch Normalization to leverage their full capacity.
 
-#### 3. Performance and the U-Shape
-* **Accuracy Ceiling:** The Residual models achieved the highest test accuracy in the study ($\approx 80\%$), significantly outperforming the best plain models ($\approx 74\%$).
-* **U-Shape Loss:** A sharp **U-shape** is still visible in the test loss for most runs, particularly the deeper and wider ones. Because skip connections enable the model to reach near $100\%$ training accuracy, the model eventually begins to memorize the training data, leading to test loss divergence.
-* **Conclusion:** Skip connections solve the **trainability** issue (the "wall"), but the models still suffer from **overfitting**, indicating that while depth is no longer a barrier to learning, regularization remains necessary to maintain generalization.
+#### 2. Case $K=[64, 128, 256]$ ($L=2, 4, 8$):
+This wide, multi-stage architecture achieved the best performance across all experiments.
+* The $L=4$ variant reached a peak test accuracy of $\approx 80\%$, proving that combining skip connections with increased width ($K$) provides the most robust architecture for CIFAR-10.
+* For $L=2$ and $L=4$, we observe a very sharp **U-shape** in the test loss. Because these models reach near $100\%$ training accuracy quickly, they begin to memorize the dataset, causing test loss to rebound aggressively after the initial drop.
+
+### Comparison to Previous Experiments
+
+1. **Comparison to Experiment 1.1:** In Experiment 1.1, depth was a liability beyond $L=4$. In Experiment 1.4, depth becomes an asset up to $L=16$, thanks to the stabilization provided by skip connections.
+2. **Comparison to Experiment 1.3:** Experiment 1.3 showed that increasing width made deep networks even more fragile, with failure occurring at $L=4$. In contrast, the Residual version of the wide architecture ($L=8, K=[64, 128, 256]$) trains perfectly and outperforms all plain models.
+3. **Generalization Gap:** Across all successful runs, the generalization gap remains the biggest challenge. While skip connections solved the **trainability wall**, the models still require early stopping or better regularization to manage the memorization of training noise.
 """
-
 
 # ==============
 
