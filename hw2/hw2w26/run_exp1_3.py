@@ -38,7 +38,7 @@ model_type = 'cnn'  # choose 'cnn' or 'resnet'
 results = []
 
 def run_configs():
-    K = [64, 128, 256]
+    K = [64, 128]
     for L in [2, 3, 4]:
         run_name = "exp1_3"
         print(f"\n=== Running {run_name} ===")

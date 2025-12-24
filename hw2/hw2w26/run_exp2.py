@@ -22,28 +22,27 @@ except Exception as e:
 seed = 42
 bs_train = 128
 batches = 400     # Ensures over 30,000 images (400 * 128 = 51,200)
-epochs = 50
+epochs = 30
 early_stopping = 5
 pool_every = 3
-hidden_dims = [512]
+hidden_dims = [256]
 lr = 1e-3
 reg = 1e-3
 model_type = 'yours' # Ensure this matches your YourCNN mapping in MODEL_TYPES
 
 results = []
+run_name = "exp2" 
 
 def run_configs():
     # --- Experiment 2: Testing YourCNN with varying widths ---
     # We use L=2 as the base because it was the most stable in Exp 1.1
-    L = 2
+    K =  [32, 64, 128]
     
-    for K_val in [32, 64, 128]:
-        K = [K_val]
+    for L in [3, 6, 9, 12]:
         
         # Following your preferred clean naming convention for the legend
-        run_name = "exp2" 
-        
-        print(f"\n=== Running {run_name} with L={L}, K={K_val} ===")
+
+        print(f"\n=== Running {run_name} with L={L}, K={K} ===")
         
         cfg = dict(
             run_name=run_name,
@@ -54,7 +53,7 @@ def run_configs():
             early_stopping=early_stopping,
             filters_per_layer=K,
             layers_per_block=L,
-            pool_every=pool_every,
+            pool_every=L,
             hidden_dims=hidden_dims,
             model_type=model_type,
             lr=lr,
@@ -70,8 +69,6 @@ def run_configs():
             status = f'error: {e}'
         
         duration = time.time() - start
-        results.append((f"{run_name}_L{L}_K{K_val}", status, duration))
-        print(f"Finished {run_name}_L{L}_K{K_val}: {status} ({duration:.1f}s)")
 
 if __name__ == '__main__':
     os.makedirs('results', exist_ok=True)

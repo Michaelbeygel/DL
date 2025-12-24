@@ -19,28 +19,14 @@ The total number of elements in $\mat{Y}$ is $N \times D_{\text{out}} = 64 \time
 
 The shape of the full Jacobian $\frac{\partial \mat{Y}}{\partial \mat{X}}$ is:
 
-$$(N \times D_{\text{out}}) \times (N \times D_{\text{in}}) = (32,768) \times (65,536) = 2,147,483,648$$
-
-
-<font color='red'>**- Boaz notes:**</font>
-(The question is about the shape, not the size.) 
-
-By simple calculations we would get that:
-
-The size of $\mat{X}$ is $64 \times 1024$.
-
-The size of $\mat{Y}$ is $64 \times 512$.
-
-The jacobian tensor would have to take into account the partial deriviative of each two elements from $\mat{X}$ and $\mat{Y}$.
-
-Therefore the shape of the jacobian tensor will be $(64 \times 512 \times 64 \times 1024)$.
+$$(N \times D_{\text{out}}) \times (N \times D_{\text{in}}) = (32,768) \times (65,536)$$
 
 **1.2 Block Matrix Structure:**
 
 When viewed as a block matrix with blocks of shape $(D_{\text{out}} \times D_{\text{in}}) = (512 \times 1024)$:
 
 The Jacobian is a **diagonal block matrix**. The structure is:
-- **Diagonal blocks** (where $i = j$): Each diagonal block equals $\mat{W}^T$ because sample $i$'s output depends only on sample $i$'s input <font color='red'> s.t : $Y_i = X_iW^T$ </font>
+- **Diagonal blocks** (where $i = j$): Each diagonal block equals $\mat{W}^T$ because sample $i$'s output depends only on sample $i$'s input $\text{s.t. } y_i = x_i W^T$
 - **Off-diagonal blocks** (where $i \neq j$): All zeros, because the output of sample $i$ is independent of the input of sample $j$
 
 **1.3 Optimization:**
@@ -49,13 +35,8 @@ Because the Jacobian is a diagonal block matrix whose diagonal blocks are all id
 
 - **Optimized storage:** one copy of the weight matrix $\mat{W}$ (or $\mat{W}^\top$) with shape $(512) \times (1024)$.
 
-This reduces storage from the full Jacobian size of $(32,768)\times(65,536)$ elements down to $512\times1024 = 524{,}288$ elements.
-
-<font color='red'>**Boaz notes:**
-
 This reduces storage from the full Jacobian of shape $(64 \times 512 \times 64 \times 1024)$  down to $(512\times1024)$, which is $64^2$ times smaller.
 
-</font>
 
 **1.4 Computing Gradient Without Materializing Jacobian:**
 Given $\delta\mathbf{Y}\in\mathbb{R}^{N\times512}$, compute per-sample
@@ -96,7 +77,7 @@ $$
 (D_{\mathrm{out}}\times D_{\mathrm{in}}) = (512\times 1024).
 $$
 
-Brief explanation: For a single sample $i$ and output unit $p$ we have
+Explanation: For a single sample $i$ and output unit $p$ we have
 $y_{i,p}=\sum_r W_{p,r}x_{i,r}$, so differentiating w.r.t. the $p$-th row of
 $W$ yields the input row $x^{(i)}$. Thus each output's derivative places
 the vector $x^{(i)}$ in the corresponding output-row, producing blocks of
@@ -554,7 +535,7 @@ part5_q1 = r"""
 ### 1. Analysis of the Effect of Depth ($L$)
 In this experiment, we observed that increasing the depth of a **plain** CNN (without skip connections) does not linearly improve performance.
 
-* **Optimal Depth:** Typically, the best results are achieved with value of $L$ (e.g., $L=2$ or $L=4$). At these depths, the network has enough capacity to learn meaningful hierarchical features from the CIFAR-10 dataset while remaining shallow enough for the gradient to flow effectively from the output back to the input layers.
+* **Optimal Depth:** Typically, the best results are achieved with value of $L=4$. At these depth, the network has enough capacity to learn meaningful hierarchical features from the CIFAR-10 dataset while remaining shallow enough for the gradient to flow effectively from the output back to the input layers.
 * **Performance Degradation:** As $L$ increases to 8 and 16, the network's accuracy begins to drop. Even though a deeper model has more parameters and theoretically higher representational capacity, the difficulty of optimizing a deep "plain" stack outweighs the benefits of the added layers.
 
 ### 2. Non-trainable values of $L$ and the Vanishing Gradient
@@ -562,8 +543,7 @@ We observed that for higher values of $L$ (specifically $L=8$ and $L=16$), the n
 
 **The Cause: Vanishing Gradients**
 In a plain CNN, the gradient is computed using the chain rule. During backpropagation, the error signal is multiplied by the weights and the derivatives of the activation functions at every layer. 
-$$ \frac{\partial \mathcal{L}}{\partial \mathbf{W}_1} = \frac{\partial \mathcal{L}}{\partial \mathbf{y}} \cdot \frac{\partial \mathbf{y}}{\partial \mathbf{h}_L} \dots \frac{\partial \mathbf{h}_2}{\partial \mathbf{h}_1} \cdot \frac{\partial \mathbf{h}_1}{\partial \mathbf{W}_1} $$
-If these intermediate derivatives are small (which is common with standard initialization), multiplying them 8 or 16 times causes the gradient to decay exponentially until it vanishes. The early layers receive no update, so the model never learns to extract basic features.
+If intermediate derivatives are small (which is common with standard initialization), multiplying them 8 or 16 times causes the gradient to decay exponentially until it vanishes. The early layers receive no update, so the model never learns to extract basic features.
 
 **Suggested Resolutions:**
 1.  **Residual Connections (Skip Connections):** Introduce "shortcuts" that allow the gradient to bypass layers. By changing the layer to $y = F(x) + x$, the gradient can flow through the identity path ($+1$ in the derivative), ensuring it stays strong even at $L=16$.
@@ -575,59 +555,103 @@ part5_q2 = r"""
 
 ### Analysis of Experiment 1.2: Filter Width ($K$) vs. Depth ($L$)
 
-In this experiment, we investigated how the number of filters ($K$) affects performance across different depths. Our results show that while width can influence the outcome, it is secondary to the impact of the network's depth.
+#### 1. Case $L=2$:
+* The network is shallow enough to converge across all tested filter widths $K$, but we observe that **smaller filter counts ($K=32$) generalize better in this configuration.
+* **U-Shape Loss:** The test loss exhibits a distinct **U-shape**, reaching a minimum before rising. This indicates that as training continues, the added complexity of 64 or 128 filters introduces more parameters than the architecture can effectively regularize, causing the model to move past the point of optimal generalization.
+* **Overfitting:** Significant overfitting is evident as training accuracy approaches $90\%$ while test accuracy plateaus much lower, creating a visible generalization gap.
 
-#### 1. Case $L=2$: The Optimal Depth
-At $L=2$, the network achieved its best overall performance, but we observed that **increasing $K$ does not necessarily lead to better results.**
-* **Observation:** The results for $K=32, 64, 128$ were relatively similar, with $K=64$ performing best and $K=128$ actually showing a slight decrease in performance compared to $K=32$.
-* **Analysis:** This suggests that for a shallow, well-optimized depth like $L=2$, a moderate number of filters (like 64) is sufficient to capture the necessary features for CIFAR-10. Increasing $K$ to 128 adds more parameters but does not provide additional discriminative power; it may even lead to slight overfitting or optimization noise, resulting in the "worse" performance observed for the largest $K$.
+#### 2. Case $L=4$:
+At $L=4$, the relationship between width and performance flips; the network now requires more filters to reach its peak potential, though overfitting becomes even more pronounced.
+* $K=64$ and $K=128$ outperformed $K=32$ in test accuracy.
+* With 4 layers, the model has enough architectural depth to benefit from a higher number of features ($K=64, 128$). However, without regularization, the model uses its increased capacity to memorize the training set rather than generalizing.
+* **U-Shape Loss:** A very sharp **U-shape** is visible in the test loss for all $K$ values. The loss drops quickly but rebounds aggressively after approximately iteration 7. This confirms that higher capacity leads to faster divergence once the training set is memorized.
+* **Overfitting:** We observe extreme overfitting across all values of $K$. For $K=128$, training accuracy reaches nearly $100\%$, yet test accuracy remains around $70\%$, resulting in a massive generalization gap.
 
-#### 2. Case $L=4$: The "Shallow" Performance
-At $L=4$, the network performed worse than the $L=2$ configurations regardless of the value of $K$.
-* **Analysis:** Although $L=4$ has more layers, the accuracy was lower than in the $L=2$ runs. This indicates that even with only 4 layers per block, the plain CNN architecture already starts to face optimization difficulties that hinder its ability to leverage its representational capacity. The extra width ($K$) in these models could not overcome the performance drop caused by the increased depth.
-
-#### 3. Case $L=8$: The Total Failure
-For $L=8$, the model remained untrainable across all values of $K$, staying at a random-guessing accuracy ($\approx 10\%$).
-* **Analysis:** This confirms that **width is irrelevant when the depth causes gradients to vanish.** No matter how many filters are available, if the error signal cannot propagate back through the 8-layer plain stack to update the weights, the model cannot learn.
+#### 3. Case $L=8$:
+* All configurations ($K=32, 64, 128$) remained stuck at $\approx 10\%$ accuracy.
+* This confirms that **width is irrelevant when depth creates an optimization barrier.** In a plain CNN architecture without skip connections or normalization, the vanishing gradient problem prevents any learning from occurring at $L=8$, rendering the number of filters $K$ moot.
 
 ### Comparison to Experiment 1.1
-Comparing these results to Experiment 1.1 highlights a key takeaway: **Depth ($L$) is the primary bottleneck.** 1. **Depth defines the ceiling:** $L=2$ was the optimal depth for this plain architecture. 
-2. **Width provides diminishing returns:** Once a stable depth is chosen, increasing $K$ provides limited benefits and eventually hits a point of diminishing returns (as seen in the $L=2, K=128$ case). 
-3. **Width cannot fix Depth:** The failure of $L=8$ across all $K$ values proves that architectural width cannot compensate for the lack of skip connections (ResNet) in deep networks.
+Comparing these results to Experiment 1.1 highlights how width and depth interact:
+1. **Depth is the primary constraint:** Just as in Experiment 1.1, increasing depth beyond a certain point ($L=8$) leads to total failure that no amount of width ($K$) can fix.
+2. Experiment 1.2 shows that the "best" $K$ depends on depth—$K=32$ was best for $L=2$, but $K=64$ was required to maximize the potential of $L=4$.
+3. While Experiment 1.1 focused on the depth-limit, Experiment 1.2 shows that even at stable depths, adding width ($K=128$) or depth ($L=4$) accelerates overfitting, leading to high training accuracy but stagnant or degrading test performance due to the lack of regularization.
 """
 
 part5_q3 = r"""
 
-### Analysis of Experiment 1.3: Depth in Multi-Block Architectures
+### Analysis of Experiment 1.3: Multi-Stage Filter Width ($K=[64, 128]$) vs. Depth ($L$)
 
-In Experiment 1.3, we used a three-block architecture with a filter progression of $K=[64, 128, 256]$ and varied the layers per block ($L=2, 3, 4$). 
+#### 1. Case $L=2$ and $L=3$:
+Both the $L=2$ and $L=3$ configurations successfully converged, as the network depth was shallow enough for the gradient to propagate effectively despite the increased width.
+* Both models achieved high performance, with $L=2$ performing slightly better, peaking at approximately $73-74\%$ test accuracy, while $L=3$ reached approximately $69-70\%$.
+* Both configurations exhibit significant overfitting, characterized by a large gap between training accuracy (approaching $100\%$) and test accuracy.
+* A clear **U-shape** is visible in the test loss for both runs; the loss reaches a minimum before rebounding upward.
+* This confirms that as the model exhausts its ability to generalize, it uses its high filter capacity to memorize the training set, causing the test performance to degrade. While $L=3$ provides more parameters, the optimization difficulty of the extra layer results in slightly lower accuracy than the $L=2$ baseline.
 
-#### 1. Effect of Depth on Accuracy
-The results show a sharp decline in performance as the total depth increases:
-* **L=2 (Total 6 Layers):** This configuration achieved the highest accuracy in this set. It manages to balance the increased capacity of the multi-block filter progression with a depth that is still (barely) optimizable for a plain CNN.
-* **L=3 and L=4 (Total 9 and 12 Layers):** We observed a significant drop in accuracy. In the case of $L=4$, the model likely failed to train completely, with accuracy remaining near $10\%$. This mirrors the failure seen in Experiment 1.1 for $L=8$.
-
-#### 2. Vanishing Gradient and Plain Architectures
-This experiment further proves the limitations of **plain convolutional stacks**. 
-* As we increase $L$, we increase the number of multiplications in the backpropagation chain. For 9 or 12 layers, the gradient of the loss with respect to the initial weights ($K=64$ block) becomes effectively zero.
-* Even though we are using a standard "feature pyramid" (increasing $K$ while decreasing spatial resolution), the **depth bottleneck** prevents the network from learning. The capacity provided by the $K=256$ layers is wasted because the earlier layers never converge on meaningful feature extractors.
+#### 2. Case $L=4$:
+At $L=4$, the multi-stage architecture suffers a total training failure, highlighting the critical trade-off between filter width and network depth.
+* Both training and test accuracy flatline at exactly $10\%$, and the training loss remains stagnant near $2.30$.
+* This result demonstrates that **increasing the width incrementally ($64 \to 128$) cannot compensate for excessive depth** in a plain CNN architecture.
+* Even though $L=4$ was trainable with narrower filters in previous runs, the added complexity of wider filters at this depth triggers an earlier optimization collapse. The gradients fail to propagate through the (K*L)=8-layer wide stack.
 
 """
 
 part5_q4 = r"""
-**Your answer:**
 
+### Analysis of Experiment 1.4: The Impact of Skip Connections
 
-Write your answer using **markdown** and $\LaTeX$:
-```python
-# A code block
-a = 2
-```
-An equation: $e^{i\pi} -1 = 0$
+In this experiment, we introduced skip connections (Residual connections) to resolve the optimization bottlenecks identified in previous experiments. These results clearly demonstrate that skip connections are the primary driver for training deeper networks effectively.
 
+The most significant result is the successful training of deep architectures that previously suffered from total optimization collapse in Experiments 1.1 and 1.3.
+* **Overcoming Vanishing Gradients:** Unlike plain CNNs, where $L \ge 8$ resulted in stagnant $10\%$ accuracy, the Residual networks with $L=8, 16, \text{and } 32$ converged successfully.
+* **Identity Mapping:** Skip connections allow the gradient to bypass weight layers through the identity path $H(x) = F(x) + x$. This ensures that the error signal remains strong enough to update early layers even at extreme depths like $L=32$.
+
+#### 1. Case $K=32$ ($L=8, 16, 32$):
+* **The Benefit of Depth:** With skip connections, we see that $L=16$ (blue) achieves high test accuracy ($\approx 77\%$), outperforming the best results from Experiment 1.1.
+* **Diminishing Returns:** Interestingly, the $L=32$ model (orange) performs worse than $L=16$, plateauing around $68\%$ test accuracy. This suggests that while skip connections solve trainability, very deep plain-residual stacks may still struggle with generalization or require additional stabilization like Batch Normalization to leverage their full capacity.
+
+#### 2. Case $K=[64, 128, 256]$ ($L=2, 4, 8$):
+This wide, multi-stage architecture achieved the best performance across all experiments.
+* The $L=4$ variant reached a peak test accuracy of $\approx 80\%$, proving that combining skip connections with increased width ($K$) provides the most robust architecture for CIFAR-10.
+* For $L=2$ and $L=4$, we observe a very sharp **U-shape** in the test loss. Because these models reach near $100\%$ training accuracy quickly, they begin to memorize the dataset, causing test loss to rebound aggressively after the initial drop.
+
+### Comparison to Previous Experiments
+
+1. **Comparison to Experiment 1.1:** In Experiment 1.1, depth was a liability beyond $L=4$. In Experiment 1.4, depth becomes an asset up to $L=16$, thanks to the stabilization provided by skip connections.
+2. **Comparison to Experiment 1.3:** Experiment 1.3 showed that increasing width made deep networks even more fragile, with failure occurring at $L=4$. In contrast, the Residual version of the wide architecture ($L=8, K=[64, 128, 256]$) trains perfectly and outperforms all plain models.
+3. **Generalization Gap:** Across all successful runs, the generalization gap remains the biggest challenge. While skip connections solved the **trainability wall**, the models still require early stopping or better regularization to manage the memorization of training noise.
 """
 
+part5_q5 = r"""
+### Question 5: Architecture Analysis of YourCNN and Experiment 2
 
+#### 1. Architectural Enhancements in YourCNN
+To improve training stability and performance relative to the initial "plain" CNN models, we introduced several key architectural changes in the `YourCNN` class:
+
+* **Residual (Skip) Connections:** We utilized the `ResidualBlock` to implement skip connections ($H(x) = F(x) + x$). This allows gradients to bypass the weight layers through an identity path, fundamentally solving the vanishing gradient problem and allowing us to train deeper stacks that previously failed.
+* **Integrated Batch Normalization:** We enabled `batchnorm=True` within each block to normalize feature map statistics. This stabilizes the distribution of inputs to deeper layers, prevents activation drifting, and allows for more robust optimization.
+* **Strategic Dropout (0.2):** We applied a dropout rate of $0.2$ to provide regularization without starving the deep layers of signal. While higher dropout (0.5) was initially tested, the $0.2$ rate provided the necessary balance to prevent neuron co-adaptation while maintaining information flow in deep architectures.
+* **Leaky ReLU Activation:** We replaced standard ReLU with Leaky ReLU (slope=$0.01$). This ensures a small gradient flow for negative inputs, mitigating the "dying ReLU" problem and preserving signal during the backward pass.
+
+
+
+#### 2. Analysis of Experiment 2 Results
+We evaluated this architecture using fixed pyramidal filters ($K=[32, 64, 128]$) across varying depths $L=3, 6, 9, 12$.
+
+* **Successful Convergence at Extreme Depths:** The introduction of residual connections and BatchNorm allowed all configurations to train effectively. Unlike previous experiments where $L=8$ or $L=12$ failed, these models show consistently decreasing training loss and increasing accuracy.
+* **Performance Peak at $L=3$:** The shallowest configuration ($L=3$, orange) achieved the highest overall performance, peaking at over $80\%$ test accuracy. As depth increased, we observed a steady decline in test performance, with $L=12$ (blue) reaching approximately $68\%$.
+* **Generalization and Overfitting:** All models reached high training accuracy (between $72\%$ and $90\%$), but the gap between training and test accuracy widened with depth. The test loss converge after 17-20 epochs from that point test accuracy the same, but the traning accuracy improved which indicate start of overfitting.
+
+
+
+#### 3. Comparison to Experiment 1.4 (Residual CNNs)
+The `YourCNN` architecture is very similar to the Residual CNNs tested in Experiment 1.4, as both rely on skip connections to enable deep learning. However, this experiment places a stronger emphasis on **generalization** through the following improvements:
+
+* **Improved Baseline:** The $L=3$ configuration in `YourCNN` reached $\approx 81\%$ test accuracy, outperforming the best $K=32$ results from Experiment 1.4 ($\approx 78\%$). This improvement is largely attributed to the addition of **Dropout**, **Batch Normalization** and **Leaky ReLU**, which provide better generalization and internal stability than the basic residual structure alone.
+* **Balanced Regularization:** By making the dropout rate to $0.2$, `YourCNN` maintains a more consistent signal than the models in Experiment 1.4.
+* Experiment 1.4 proved that skip connections fix **trainability**, but `YourCNN` demonstrates that combining them with Dropout, BatchNorm and Leaky ReLU is necessary to improve **generalization** on the test set. 
+"""
 # ==============
 
 # ==============

@@ -24,7 +24,7 @@ bs_train = 128
 batches = 500
 epochs = 50
 early_stopping = 5
-pool_ever = 3
+pool_every_ = 3
 hidden_dims = [512]
 lr = 1e-3
 reg = 1e-3
@@ -46,7 +46,7 @@ def run_configs():
             batches=batches,
             epochs=epochs,
             early_stopping=early_stopping,
-            pool_every=pool_ever,
+            pool_every=6 if L == 32 else pool_every_,
             filters_per_layer=K1,
             layers_per_block=L,
             hidden_dims=hidden_dims,
@@ -71,9 +71,8 @@ def run_configs():
     K2 = [64, 128, 256]
     for L in [2, 4, 8]:
         # P=L ensures one pool after each filter stage
-        pool_every = L
         
-        run_name = f"exp1_4_L{L}_K{'-'.join(map(str, K2))}"
+        run_name = "exp1_4"
         print(f"\n=== Running {run_name} ===")
         
         cfg = dict(
@@ -85,7 +84,7 @@ def run_configs():
             early_stopping=early_stopping,
             filters_per_layer=K2,
             layers_per_block=L,
-            pool_every=pool_every,
+            pool_every=6 if L == 8 else 4,
             hidden_dims=hidden_dims,
             model_type=model_type,
             lr=lr,
