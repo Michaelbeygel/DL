@@ -53,7 +53,7 @@ def run_configs():
             early_stopping=early_stopping,
             filters_per_layer=K,
             layers_per_block=L,
-            pool_every=pool_every,
+            pool_every=L,
             hidden_dims=hidden_dims,
             model_type=model_type,
             lr=lr,
