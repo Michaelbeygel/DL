@@ -35,21 +35,10 @@ class Trainer(abc.ABC):
         :param device: torch.device to run training on (CPU or GPU).
         """
         self.model = model
-        # self.device = device
+        self.device = device
 
-        # if self.device:
-        #     model.to(self.device)
-        # Ensure self.device is a torch.device object
-        if device is None:
-            # Fallback if device is not provided, but it should be provided by cnn_experiment now
-            self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        else:
-            self.device = torch.device(device)
-
-        # Move the model to the trainer's designated device
-        # This is essential to ensure the model's weights are on the correct device
-        if hasattr(self.model, "to"):
-            self.model.to(self.device)
+        if self.device:
+            model.to(self.device)
 
     def fit(
         self,
