@@ -623,6 +623,35 @@ This wide, multi-stage architecture achieved the best performance across all exp
 3. **Generalization Gap:** Across all successful runs, the generalization gap remains the biggest challenge. While skip connections solved the **trainability wall**, the models still require early stopping or better regularization to manage the memorization of training noise.
 """
 
+part5_q5 = r"""
+### Question 5: Architecture Analysis of YourCNN and Experiment 2
+
+#### 1. Architectural Enhancements in YourCNN
+To improve training stability and performance relative to the initial "plain" CNN models, we introduced several key architectural changes in the `YourCNN` class:
+
+* **Residual (Skip) Connections:** We utilized the `ResidualBlock` to implement skip connections ($H(x) = F(x) + x$). This allows gradients to bypass the weight layers through an identity path, fundamentally solving the vanishing gradient problem and allowing us to train deeper stacks that previously failed.
+* **Integrated Batch Normalization:** We enabled `batchnorm=True` within each block to normalize feature map statistics. This stabilizes the distribution of inputs to deeper layers, prevents activation drifting, and allows for more robust optimization.
+* **Strategic Dropout (0.2):** We applied a dropout rate of $0.2$ to provide regularization without starving the deep layers of signal. While higher dropout (0.5) was initially tested, the $0.2$ rate provided the necessary balance to prevent neuron co-adaptation while maintaining information flow in deep architectures.
+* **Leaky ReLU Activation:** We replaced standard ReLU with Leaky ReLU (slope=$0.01$). This ensures a small gradient flow for negative inputs, mitigating the "dying ReLU" problem and preserving signal during the backward pass.
+
+
+
+#### 2. Analysis of Experiment 2 Results
+We evaluated this architecture using fixed pyramidal filters ($K=[32, 64, 128]$) across varying depths $L=3, 6, 9, 12$.
+
+* **Successful Convergence at Extreme Depths:** The introduction of residual connections and BatchNorm allowed all configurations to train effectively. Unlike previous experiments where $L=8$ or $L=12$ failed, these models show consistently decreasing training loss and increasing accuracy.
+* **Performance Peak at $L=3$:** The shallowest configuration ($L=3$, orange) achieved the highest overall performance, peaking at over $80\%$ test accuracy. As depth increased, we observed a steady decline in test performance, with $L=12$ (blue) reaching approximately $68\%$.
+* **Generalization and Overfitting:** All models reached high training accuracy (between $72\%$ and $90\%$), but the gap between training and test accuracy widened with depth. The test loss converge after 17-20 epochs from that point test accuracy the same, but the traning accuracy improved which indicate start of overfitting.
+
+
+
+#### 3. Comparison to Experiment 1.4 (Residual CNNs)
+The `YourCNN` architecture is very similar to the Residual CNNs tested in Experiment 1.4, as both rely on skip connections to enable deep learning. However, this experiment places a stronger emphasis on **generalization** through the following improvements:
+
+* **Improved Baseline:** The $L=3$ configuration in `YourCNN` reached $\approx 81\%$ test accuracy, outperforming the best $K=32$ results from Experiment 1.4 ($\approx 78\%$). This improvement is largely attributed to the addition of **Dropout**, **Batch Normalization** and **Leaky ReLU**, which provide better generalization and internal stability than the basic residual structure alone.
+* **Balanced Regularization:** By making the dropout rate to $0.2$, `YourCNN` maintains a more consistent signal than the models in Experiment 1.4.
+* Experiment 1.4 proved that skip connections fix **trainability**, but `YourCNN` demonstrates that combining them with Dropout, BatchNorm and Leaky ReLU is necessary to improve **generalization** on the test set. 
+"""
 # ==============
 
 # ==============
