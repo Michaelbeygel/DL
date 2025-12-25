@@ -85,8 +85,13 @@ class Trainer(abc.ABC):
             # ====== YOUR CODE: ======
             
             # Calculating the train and test results using the given functions.
-            train_result = self.train_epoch(dl_train)
-            test_result = self.test_epoch(dl_test)
+            # changed here: old version: 
+            #train_result = self.train_epoch(dl_train)
+            #test_result = self.test_epoch(dl_test)
+            # Fix:
+            train_result = self.train_epoch(dl_train, verbose=verbose, **kw)
+            test_result  = self.test_epoch(dl_test,  verbose=verbose, **kw)
+            
             # Getting the losses and accuracy from the EpochResult objects returned by the (train\test)_epoch function.
             # Adding these values to the (train\test)_(loss\accuracy) arrays, respectively.
             train_loss.append(sum(train_result.losses) / len(train_result.losses)) # Appending the avarage losses for each epoch
@@ -267,9 +272,9 @@ class ClassifierTrainer(Trainer):
 
     def train_batch(self, batch) -> BatchResult:
         X, y = batch
-        if self.device:
-            X = X.to(self.device)
-            y = y.to(self.device)
+
+        X = X.to(self.device)
+        y = y.to(self.device)
 
         self.model: Classifier
         batch_loss: float
@@ -302,9 +307,9 @@ class ClassifierTrainer(Trainer):
 
     def test_batch(self, batch) -> BatchResult:
         X, y = batch
-        if self.device:
-            X = X.to(self.device)
-            y = y.to(self.device)
+
+        X = X.to(self.device)
+        y = y.to(self.device)
 
         self.model: Classifier
         batch_loss: float
@@ -347,6 +352,10 @@ class LayerTrainer(Trainer):
         #  - Calculate number of correct predictions (make sure it's an int,
         #    not a tensor) as num_correct.
         # ====== YOUR CODE: ======
+        
+        X = X.to(self.device)
+        y = y.to(self.device)
+
         # Flatten the images.
         X = X.reshape(X.shape[0], -1)
         # Zeroing past gradients.
@@ -372,6 +381,9 @@ class LayerTrainer(Trainer):
 
         # TODO: Evaluate the Layer model on one batch of data.
         # ====== YOUR CODE: ======
+        
+        X = X.to(self.device)
+        y = y.to(self.device)
 
         # Flatten the images.
         X = X.reshape(X.shape[0], -1)

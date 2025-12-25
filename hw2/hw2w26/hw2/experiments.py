@@ -163,7 +163,7 @@ def cnn_experiment(
     # Setup Training components
     loss_fn = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(params=model.parameters(), lr=lr, weight_decay=reg)
-    trainer = ClassifierTrainer(model, loss_fn, optimizer)
+    trainer = ClassifierTrainer(model, loss_fn, optimizer,device=device)
 
     # Run Training
     fit_res = trainer.fit(
