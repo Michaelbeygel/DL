@@ -267,9 +267,9 @@ class ClassifierTrainer(Trainer):
 
     def train_batch(self, batch) -> BatchResult:
         X, y = batch
-
-        X = X.to(self.device)
-        y = y.to(self.device)
+        if self.device:
+            X = X.to(self.device)
+            y = y.to(self.device)
 
         self.model: Classifier
         batch_loss: float
@@ -302,9 +302,9 @@ class ClassifierTrainer(Trainer):
 
     def test_batch(self, batch) -> BatchResult:
         X, y = batch
-
-        X = X.to(self.device)
-        y = y.to(self.device)
+        if self.device:
+            X = X.to(self.device)
+            y = y.to(self.device)
 
         self.model: Classifier
         batch_loss: float
@@ -347,10 +347,6 @@ class LayerTrainer(Trainer):
         #  - Calculate number of correct predictions (make sure it's an int,
         #    not a tensor) as num_correct.
         # ====== YOUR CODE: ======
-        
-        X = X.to(self.device)
-        y = y.to(self.device)
-
         # Flatten the images.
         X = X.reshape(X.shape[0], -1)
         # Zeroing past gradients.
@@ -376,9 +372,6 @@ class LayerTrainer(Trainer):
 
         # TODO: Evaluate the Layer model on one batch of data.
         # ====== YOUR CODE: ======
-        
-        X = X.to(self.device)
-        y = y.to(self.device)
 
         # Flatten the images.
         X = X.reshape(X.shape[0], -1)
