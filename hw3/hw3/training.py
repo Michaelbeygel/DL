@@ -94,7 +94,29 @@ class Trainer(abc.ABC):
             #  - Implement early stopping. This is a very useful and
             #    simple regularization technique that is highly recommended.
             # ====== YOUR CODE: ======
-            pass
+            # 1. Train for one epoch
+            train_res = self.train_epoch(dl_train, **kw)
+            train_loss.extend(train_res.losses)
+            train_acc.append(train_res.accuracy)
+
+            # 2. Test for one epoch
+            test_res = self.test_epoch(dl_test, **kw)
+            test_loss.extend(test_res.losses)
+            test_acc.append(test_res.accuracy)
+
+            actual_num_epochs += 1
+
+            # 3. Early stopping & Checkpointing logic
+            if best_acc is None or test_res.accuracy > best_acc:
+                best_acc = test_res.accuracy
+                epochs_without_improvement = 0
+                save_checkpoint = True
+            else:
+                epochs_without_improvement += 1
+
+            if early_stopping is not None and epochs_without_improvement >= early_stopping:
+                self._print(f"Stopping early after {epoch+1} epochs due to no improvement.", verbose)
+                break
             # ========================
 
             # Save model checkpoint if requested
@@ -105,12 +127,10 @@ class Trainer(abc.ABC):
                     model_state=self.model.state_dict(),
                 )
                 torch.save(saved_state, checkpoint_filename)
-                print(
-                    f"*** Saved checkpoint {checkpoint_filename} " f"at epoch {epoch + 1}"
-                )
+                print(f"*** Saved checkpoint {checkpoint_filename} at epoch {epoch + 1}")
 
             if post_epoch_fn:
-                post_epoch_fn(epoch, train_result, test_result, verbose)
+                post_epoch_fn(epoch, train_res, test_res, verbose)
 
         return FitResult(actual_num_epochs, train_loss, train_acc, test_loss, test_acc)
 
@@ -222,15 +242,13 @@ class RNNTrainer(Trainer):
     def train_epoch(self, dl_train: DataLoader, **kw):
         # TODO: Implement modifications to the base method, if needed.
         # ====== YOUR CODE: ======
-        pass
-        # ========================
+        self.hidden_state = None
         return super().train_epoch(dl_train, **kw)
 
     def test_epoch(self, dl_test: DataLoader, **kw):
         # TODO: Implement modifications to the base method, if needed.
         # ====== YOUR CODE: ======
-        pass
-        # ========================
+        self.hidden_state = None
         return super().test_epoch(dl_test, **kw)
 
     def train_batch(self, batch) -> BatchResult:
@@ -247,11 +265,35 @@ class RNNTrainer(Trainer):
         #  - Update params
         #  - Calculate number of correct char predictions
         # ====== YOUR CODE: ======
-        pass
+        self.optimizer.zero_grad()
+        
+        # 1. Forward pass
+        # We pass the preserved hidden state from the previous batch
+        # y_pred: (B, S, V), self.hidden_state: (B, L, H)
+        y_pred, self.hidden_state = self.model(x, self.hidden_state)
+        
+        # We must detach the hidden state from the current graph to prevent 
+        # backpropagating all the way to the start of the corpus (Truncated BPTT).
+        self.hidden_state = self.hidden_state.detach()
+        
+        # 2. Loss calculation
+        # CrossEntropyLoss expects (N, C) for predictions and (N) for targets.
+        # We flatten the batch and sequence dimensions together.
+        # y_pred -> (B*S, V), y -> (B*S)
+        loss = self.loss_fn(y_pred.view(-1, self.model.out_dim), y.view(-1))
+        
+        # 3. Backward pass
+        loss.backward()
+        
+        # 4. Update parameters
+        self.optimizer.step()
+        
+        # 5. Accuracy calculation
+        # argmax along the vocabulary dimension (V)
+        predictions = torch.argmax(y_pred, dim=2)
+        num_correct = torch.sum(predictions == y)
         # ========================
 
-        # Note: scaling num_correct by seq_len because each sample has seq_len
-        # different predictions.
         return BatchResult(loss.item(), num_correct.item() / seq_len)
 
     def test_batch(self, batch) -> BatchResult:
@@ -267,7 +309,12 @@ class RNNTrainer(Trainer):
             #  - Loss calculation
             #  - Calculate number of correct predictions
             # ====== YOUR CODE: ======
-            pass
+            y_pred, self.hidden_state = self.model(x, self.hidden_state)
+            
+            # Loss and predictions
+            loss = self.loss_fn(y_pred.view(-1, self.model.out_dim), y.view(-1))
+            predictions = torch.argmax(y_pred, dim=2)
+            num_correct = torch.sum(predictions == y)
             # ========================
 
         return BatchResult(loss.item(), num_correct.item() / seq_len)
