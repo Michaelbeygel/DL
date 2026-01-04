@@ -182,7 +182,7 @@ class VAE(nn.Module):
             #    the mean, i.e. psi(z).
             # ====== YOUR CODE: ======
             
-            z = torch.randn(n, self.z_dim)  # sample from prior
+            z = torch.randn(n, self.z_dim, device=device)  # sample from prior
             samples = self.decode(z)
 
             # ========================
