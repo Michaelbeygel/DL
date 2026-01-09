@@ -26,7 +26,32 @@ def sliding_window_attention(q, k, v, window_size, padding_mask=None):
     values, attention = None, None
 
     # ====== YOUR CODE: ======
-    pass
+    # 1. Compute the scaled dot product: B = (Q @ K^T) / sqrt(d)
+    # k.transpose(-2, -1) handles both 3D and 4D tensors correctly
+    scores = torch.matmul(q, k.transpose(-2, -1)) / (embed_dim ** 0.5)
+
+    # 2. Create the sliding window mask based on token distances
+    # Generate a matrix where entry (i, j) is |i - j|
+    indices = torch.arange(seq_len, device=q.device)
+    # Use broadcasting to get the absolute difference between all index pairs
+    distance_matrix = torch.abs(indices.view(-1, 1) - indices.view(1, -1))
+    
+    # Identify positions outside the window (distance > w/2)
+    out_of_window_mask = distance_matrix > (window_size // 2)
+    
+    # Apply the sliding window mask by setting scores to -infinity
+    scores = scores.masked_fill(out_of_window_mask, float('-inf'))
+
+    # 3. Apply padding mask if provided
+    if padding_mask is not None:
+        # padding_mask is [Batch, SeqLen], we reshape to [Batch, 1, 1, SeqLen]
+        # to mask the keys (columns) for every query across all heads
+        p_mask = padding_mask.view(batch_size, 1, 1, seq_len) == 0
+        scores = scores.masked_fill(p_mask, float('-inf'))
+
+    # 4. Compute attention weights (A = softmax(B)) and output values (Y = AV)
+    attention = torch.softmax(scores, dim=-1)
+    values = torch.matmul(attention, v)
     # ======================
 
     return values, attention
