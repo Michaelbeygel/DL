@@ -94,7 +94,11 @@ class MultiHeadAttention(nn.Module):
         # Determine value outputs
         # call the sliding window attention function you implemented
         # ====== YOUR CODE: ======
-        pass
+        values, attention = sliding_window_attention(
+            q, k, v, 
+            window_size=self.window_size, 
+            padding_mask=padding_mask
+        )
         # ========================
 
         values = values.permute(0, 2, 1, 3) # [Batch, SeqLen, Head, Dims]
@@ -164,15 +168,19 @@ class EncoderLayer(nn.Module):
         self.dropout = nn.Dropout(dropout)
         
     def forward(self, x, padding_mask):
-        '''
-        :param x: the input to the layer of shape [Batch, SeqLen, Dims]
-        :param padding_mask: the padding mask of shape [Batch, SeqLen]
-        :return: the output of the layer of shape [Batch, SeqLen, Dims]
-        '''
-
-        # ====== YOUR CODE: ======
-        pass
-        # ========================
+        # 1. Multi-Head Self-Attention
+        # self_attn returns just 'o' (the projected values)
+        attn_out = self.self_attn(x, padding_mask)
+        
+        # Step: Residual + Dropout, then Norm
+        # Ensure you use self.dropout (from EncoderLayer), not an internal one
+        x = self.norm1(x + self.dropout(attn_out))
+        
+        # 2. Position-Wise Feed-Forward
+        ff_out = self.feed_forward(x)
+        
+        # Step: Residual + Dropout, then Norm
+        x = self.norm2(x + self.dropout(ff_out))
         
         return x
     
