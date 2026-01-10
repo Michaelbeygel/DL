@@ -23,36 +23,37 @@ def sliding_window_attention(q, k, v, window_size, padding_mask=None):
     embed_dim = q.shape[-1]
     batch_size = q.shape[0]
 
-    values, attention = None, None
-
-    # ====== YOUR CODE: ======
-    # 1. Compute the scaled dot product: B = (Q @ K^T) / sqrt(d)
-    # k.transpose(-2, -1) handles both 3D and 4D tensors correctly
+    # 1. Compute Scaled Dot Product Scores
+    # [Batch, (Heads), SeqLen, SeqLen]
     scores = torch.matmul(q, k.transpose(-2, -1)) / (embed_dim ** 0.5)
 
-    # 2. Create the sliding window mask based on token distances
-    # Generate a matrix where entry (i, j) is |i - j|
+    # 2. Sliding Window Masking
+    # Create distance matrix |i - j| via broadcasting
     indices = torch.arange(seq_len, device=q.device)
-    # Use broadcasting to get the absolute difference between all index pairs
     distance_matrix = torch.abs(indices.view(-1, 1) - indices.view(1, -1))
     
-    # Identify positions outside the window (distance > w/2)
+    # Define window boundaries
     out_of_window_mask = distance_matrix > (window_size // 2)
     
-    # Apply the sliding window mask by setting scores to -infinity
-    scores = scores.masked_fill(out_of_window_mask, float('-inf'))
+    # Apply local constraint using the smallest possible float value
+    neg_inf = torch.finfo(scores.dtype).min
+    scores = scores.masked_fill(out_of_window_mask, neg_inf)
 
-    # 3. Apply padding mask if provided
+    # 3. Padding Masking (Keys/Columns)
+    # Broadcast [B, S] -> [B, 1, 1, S] to cover all Heads and Query rows
     if padding_mask is not None:
-        # padding_mask is [Batch, SeqLen], we reshape to [Batch, 1, 1, SeqLen]
-        # to mask the keys (columns) for every query across all heads
-        p_mask = padding_mask.view(batch_size, 1, 1, seq_len) == 0
-        scores = scores.masked_fill(p_mask, float('-inf'))
+        mask_keys = padding_mask.view(batch_size, 1, 1, seq_len).to(torch.bool)
+        scores = scores.masked_fill(mask_keys == 0, neg_inf)
 
-    # 4. Compute attention weights (A = softmax(B)) and output values (Y = AV)
+    # 4. Attention Weights and Context Vectors
     attention = torch.softmax(scores, dim=-1)
     values = torch.matmul(attention, v)
-    # ======================
+
+    # 5. Output Masking (Queries/Rows)
+    # Broadcast [B, S] -> [B, 1, S, 1] to zero out padding query outputs
+    if padding_mask is not None:
+        mask_queries = padding_mask.view(batch_size, 1, seq_len, 1).to(values.dtype)
+        values = values * mask_queries
 
     return values, attention
 
@@ -218,14 +219,22 @@ class Encoder(nn.Module):
         :param padding mask #[Batch, max_seq_len]
         :return: the logits  [Batch]
         '''
-        output = None
-
-        # ====== YOUR CODE: ======
-        pass
-        # ========================
+        # Embedding and Positional Encoding
+        x = self.encoder_embedding(sentence)
+        x = self.positional_encoding(x)
+        x = self.dropout(x)
         
+        # Process through transformer blocks
+        for layer in self.encoder_layers:
+            x = layer(x, padding_mask)
         
-        return output  
+        # Pooling: Extract the first [CLS] token for classification
+        # Shape: [Batch, embed_dim]
+        cls_token = x[:, 0, :]
+        
+        # Classification Head
+        # Returns [Batch, 1]
+        return self.classification_mlp(cls_token)
     
     def predict(self, sentence, padding_mask):
         '''
