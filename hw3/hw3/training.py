@@ -379,21 +379,23 @@ class TransformerEncoderTrainer(Trainer):
         return BatchResult(loss.item(), num_correct.item())
 
     def test_batch(self, batch) -> BatchResult:
+        # Ensure we are in evaluation mode (affects Dropout)
+        self.model.eval() 
+        
         with torch.no_grad():
             input_ids = batch['input_ids'].to(self.device)
             attention_mask = batch['attention_mask'].float().to(self.device)
             label = batch['label'].float().to(self.device)
 
-            loss = None
-            num_correct = None
+            # Forward pass
+            pred = self.model(input_ids, attention_mask)
+            
+            # Loss computation
+            loss = self.loss_fn(pred.squeeze(-1), label)
 
-            # TODO:
-            #  fill out the testing loop.
-            # ====== YOUR CODE: ======
-            pass
-            # ========================
-
-
+            # Compute number of correct predictions
+            y_pred = torch.round(torch.sigmoid(pred.squeeze(-1)))
+            num_correct = (y_pred == label).sum()
 
         return BatchResult(loss.item(), num_correct.item())
 

@@ -11,13 +11,13 @@ math (delimited with $$).
 
 def part1_rnn_hyperparams():
     hypers = dict(
-        batch_size=64,          # Larger batches provide more stable gradient estimates
+        batch_size=256,          # Larger batches provide more stable gradient estimates
         seq_len=64,             # Long enough to capture words and basic sentence structure
-        h_dim=512,              # Increased hidden dimension for higher model capacity
+        h_dim=128,              # Increased hidden dimension for higher model capacity
         n_layers=3,             # Depth to learn hierarchical text representations
-        dropout=0.2,            # Moderate dropout to prevent overfitting on the corpus
+        dropout=0.25,            # Moderate dropout to prevent overfitting on the corpus
         learn_rate=0.001,       # Standard starting rate for the Adam optimizer
-        lr_sched_factor=0.5,    # Reduce LR by half when performance plateaus
+        lr_sched_factor=0.1,    # Reduce LR by half when performance plateaus
         lr_sched_patience=3,    # Wait 3 epochs of no improvement before reducing LR
     )
     # ====== YOUR CODE: ======
@@ -228,13 +228,13 @@ Using log-variance allows unconstrained optimization and would lead to more stab
 
 def part3_transformer_encoder_hyperparams():
     hypers = dict(
-        embed_dim = 0, 
-        num_heads = 0,
-        num_layers = 0,
-        hidden_dim = 0,
-        window_size = 0,
-        droupout = 0.0,
-        lr=0.0,
+        embed_dim = 128, 
+        num_heads = 4,
+        num_layers = 3,
+        hidden_dim = 256,
+        window_size = 128,
+        droupout = 0.2,
+        lr=0.0001,
     )
 
     # TODO: Tweak the hyperparameters to train the transformer encoder.

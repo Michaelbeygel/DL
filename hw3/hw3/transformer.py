@@ -36,7 +36,7 @@ def sliding_window_attention(q, k, v, window_size, padding_mask=None):
     out_of_window_mask = distance_matrix > (window_size // 2)
     
     # Apply local constraint using the smallest possible float value
-    neg_inf = torch.finfo(scores.dtype).min
+    neg_inf = float('-inf')
     scores = scores.masked_fill(out_of_window_mask, neg_inf)
 
     # 3. Padding Masking (Keys/Columns)
@@ -47,12 +47,16 @@ def sliding_window_attention(q, k, v, window_size, padding_mask=None):
 
     # 4. Attention Weights and Context Vectors
     attention = torch.softmax(scores, dim=-1)
+    # Clean NaNs rows
+    attention = torch.nan_to_num(attention, nan=0.0)
     values = torch.matmul(attention, v)
 
     # 5. Output Masking (Queries/Rows)
     # Broadcast [B, S] -> [B, 1, S, 1] to zero out padding query outputs
     if padding_mask is not None:
         mask_queries = padding_mask.view(batch_size, 1, seq_len, 1).to(values.dtype)
+        # we set output of padding to zero then the residual connection will set it back to padding:
+        # x+attention(x) = <PAD> + [0, 0, ... , 0] = <PAD>
         values = values * mask_queries
 
     return values, attention
@@ -169,18 +173,17 @@ class EncoderLayer(nn.Module):
         self.dropout = nn.Dropout(dropout)
         
     def forward(self, x, padding_mask):
-        # 1. Multi-Head Self-Attention
+        # Multi-Head Self-Attention
         # self_attn returns just 'o' (the projected values)
         attn_out = self.self_attn(x, padding_mask)
         
-        # Step: Residual + Dropout, then Norm
-        # Ensure you use self.dropout (from EncoderLayer), not an internal one
+        # Residual + Dropout, then Norm
         x = self.norm1(x + self.dropout(attn_out))
         
-        # 2. Position-Wise Feed-Forward
+        # Position-Wise Feed-Forward
         ff_out = self.feed_forward(x)
         
-        # Step: Residual + Dropout, then Norm
+        # Residual + Dropout, then Norm
         x = self.norm2(x + self.dropout(ff_out))
         
         return x
