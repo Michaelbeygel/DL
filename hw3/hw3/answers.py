@@ -295,7 +295,7 @@ In general every dilation $d$ will give us a receptive field of $~dw$, with $w$ 
 The computational complexity will still be $O(nw)$ because each token computes attention over a fixed number of keys, independent of sequence length.
 
 As a result of the larger window size, the attention will be computed on a more global context.
-Because the receptive field with dilation $d$ is $dw$, it is still $"O(w)"$.
+Because the receptive field with dilation $d$ is $dw$, it is still "$O(w)$".
 The innovation is that **numerically** we can have a much bigger receptive field, at the same computational cost.
 
 As in the regular sliding window approach, the information would be shared through the self-attention mechanism where each token ignores some of the other tokens.
