@@ -245,11 +245,72 @@ def part3_transformer_encoder_hyperparams():
 
 
 part3_q1 = r"""
-**Your answer:**
+
+Let's first take a look at one encoder layer that use the sliding window attention.
+As seen in the "Sliding Window Attention" section, the intermediate calculation of the normalized dot product can be written as:
+$$
+\mathrm{b}(q, k, w) 
+=
+\begin{cases}
+    q⋅k^T\over{\sqrt{d_k}} & \mathrm{if} \;d(q,k) ≤ {{w}\over{2}} \\
+    -\infty & \mathrm{otherwise}
+\end{cases}.
+$$
+Therefore in order to calculate $B$, we would use:
+$$
+B_{ij} =
+\begin{cases}
+q_i \cdot k_j^T \over{\sqrt{d_k}} & \mathrm{if} \|i - j\| ≤ {{w}\over{2}} \\
+-\infty & \text{otherwise},
+\end{cases}
+$$
+As we can see, tokens that have a distance greater than ${{w}\over{2}}$ will have a value of $-\infty$. 
+After applying softmax they will turn to 0.
+Hence, with one sliding window encoder layer, each token attends only to it's neighboring $w$ tokens in the input sequence and to itself.
+That means that it will have some data from itself and it's neighboring $w$ tokens embedded in it.
+Therefore the context size is $1+w$.
+
+When applying another sliding window encoder layer, we will see the phenomenna that each output token attends only by its neighboring $w$ input sequence tokens of the current layer, and itself.
+But, each input token of the second layer attends to itself and it's original neighboring $w$ tokens. 
+Therefore each output token from the second layer attends to the neighboring $2w$ tokens of the original input sequence tokens, and itself.
+
+Therefore the context size of the first layer is $1+w$, and of the second layer is $1+2w$.
+
+From the same explanation above we would get that adding $L$ sliding window encoders will result in a context size of $1 + Lw$.
+
+**Note:** this result is theoretical. 
+In practice, stacking sliding windows does not add to a very big context size due to signal decay.
+
 """
 
 part3_q2 = r"""
-**Your answer:**
+
+Our variation of the attention pattern will be the 'Dilated Sliding window' approach, as proposed briefly in the Longformer paper.
+In the dilated approach, each window will have gaps of size dilation $d$. 
+For example, for $d=2$, we would get that between two tokens there exists a token that is not taken into account.
+We will denote the receptive field as the "area" that the sliding window covers.
+Therefore, the receptive field is now $~2w$, although the number of active tokens is still $w$.
+In general every dilation $d$ will give us a receptive field of $~dw$, with $w$ active tokens.
+
+The computational complexity will still be $O(nw)$ because each token computes attention over a fixed number of keys, independent of sequence length.
+
+As a result of the larger window size, the attention will be computed on a more global context.
+Because the receptive field with dilation $d$ is $dw$, it is still $"O(w)"$.
+The innovation is that **numerically** we can have a much bigger receptive field, at the same computational cost.
+
+As in the regular sliding window approach, the information would be shared through the self-attention mechanism where each token ignores some of the other tokens.
+Unlike regular sliding window, in the dilated approach the tokens that are taken into account are sparse.
+This, of course, will cause limitation for information sharing in a single dilated sliding window encoder layer. 
+For example, in a text about the "Israel Institute of Technology", the output token of "Institute" might not attend to the "Israel" token! 
+So we are "paying" for the large window size, at the cost of quality attentions.
+
+Are we really losing quality? Not really. 
+That is because when applying multiple dilated sliding window layers, subsequent layers will attend to the outputs of the previous ones.
+This allows the information to flow. 
+A token that was in a "blind spot" in Layer 1 becomes accessible in following layers because its neighbors have now carried forward its information.
+In order to get this "effect" that the blind spot are disapearing we will need to add some layers, depending on the $d$'s we will choose.
+
+
 """
 
 # ==============
