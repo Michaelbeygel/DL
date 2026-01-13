@@ -233,7 +233,7 @@ def part3_transformer_encoder_hyperparams():
         num_layers = 3,
         hidden_dim = 256,
         window_size = 128,
-        droupout = 0.2,
+        droupout = 0.1,
         lr=0.0001,
     )
 
