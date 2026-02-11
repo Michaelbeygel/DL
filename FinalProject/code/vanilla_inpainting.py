@@ -1,4 +1,3 @@
-import sys
 import torch
 from transformers import CLIPTokenizer, CLIPTextModel
 from diffusers import DDIMScheduler, AutoencoderKL, UNet2DConditionModel
@@ -86,7 +85,7 @@ latents = torch.randn(
 
 scheduler.set_timesteps(50)
 latents = latents * scheduler.init_noise_sigma # Scale the noisy latent by the scheduler scalar, as it was trained on
-guidance_scale = 7 # Higher values -> higher dependency on the prompt
+guidance_scale = 5 # Control the CFG. Higher values -> higher dependency on the prompt, more noise
 
 # Applying the diffusion iterations.
 for t in scheduler.timesteps:
