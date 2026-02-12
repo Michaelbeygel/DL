@@ -1,9 +1,15 @@
+## Problems worth dealing with in current version:
+# 1) When transforming the latent instance back to feature space, we lose the specific values of the given image!
+#    That is because we are applying the given image noisy versions in the stable diffusion process in the latent space. 
+
 import torch
 from transformers import CLIPTokenizer, CLIPTextModel
 from diffusers import DDIMScheduler, AutoencoderKL, UNet2DConditionModel
 from diffusers.utils import load_image
 from PIL import Image
 import numpy as np
+from torchvision import transforms
+import utils
 
 # Set up device and dtype
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -71,17 +77,29 @@ with torch.no_grad():
 
 # Sample random latent space data
 batch_size = 1
-latent_height = latent_width = unet.config.sample_size
+latent_sample_size = unet.config.sample_size
 latents = torch.randn(
     (
         batch_size,
         unet.config.in_channels,
-        latent_height,
-        latent_width,
+        latent_sample_size, # Height = latent sample size
+        latent_sample_size, # Widrh = latent sample size
     ),
     device=device,
     dtype=dtype,
 )
+
+image_path = "image.jpg"
+mask_path = "mask.jpg"
+
+# 1) Transform image to torch and then to latent space by using the encoder
+vae_sample_size = vae.config.sample_size #  size of fature space
+img_tensor = utils.image_to_tensor(image_path=image_path, tensor_size=vae_sample_size)
+
+# 2) Transform mask to latent space size torch tensor. Not using autoencoder.
+mask_latent_tensor = utils.image_to_tensor(image_path=mask_path, tensor_size=latent_sample_size)
+    
+# 3) Each step apply multiplication between the mask and the diffusion step
 
 scheduler.set_timesteps(50)
 latents = latents * scheduler.init_noise_sigma # Scale the noisy latent by the scheduler scalar, as it was trained on
@@ -116,10 +134,5 @@ latents = latents / vae.config.scaling_factor
 with torch.no_grad():
     image = vae.decode(latents).sample
 
-image = (image / 2 + 0.5).clamp(0, 1)
-image = (image * 255).round().to(torch.uint8)
-image = image.cpu().permute(0, 2, 3, 1)  # BCHW → BHWC
-image = image[0].numpy()
-image = Image.fromarray(image)
-image.save("generated.png")
+utils.tensor_to_image(image_tensor=image, saving_path="generated.png")
 
