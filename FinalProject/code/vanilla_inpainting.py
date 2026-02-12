@@ -1,6 +1,7 @@
 ## Problems worth dealing with in current version:
 # 1) When transforming the latent instance back to feature space, we lose the specific values of the given image!
 #    That is because we are applying the given image noisy versions in the stable diffusion process in the latent space. 
+# 2) Apply continous mask, instead of a binary one.
 
 import torch
 from transformers import CLIPTokenizer, CLIPTextModel
@@ -28,7 +29,7 @@ unet = pipe_comp_dict["unet"]
 vae = pipe_comp_dict["vae"]
 scheduler = pipe_comp_dict["scheduler"]
 
-prompt = "Portrait of a beautiful woman sitting at a Parisian cafe table, white sweater, holding a coffee cup, soft sunlight, blurred street background, high resolution, highly detailed skin, 8k, cinematic lighting."
+prompt = "A dog sitting, white background"
 
 # Embedd the prompt. workflow: prompt -> tokens -> embedding
 text_embeddings = utils.get_text_embeddings(prompt, tokenizer,text_encoder, device)
@@ -51,17 +52,15 @@ latents = torch.randn(
 
 # Transform image to torch tensor and then to latent space
 vae_sample_size = vae.config.sample_size #  size of feature space
-img_tensor = utils.image_to_tensor(image_path=image_path, tensor_size=vae_sample_size, device=device, dtype=dtype) # Image to tensor
+img_tensor = utils.image_to_tensor(image_path=image_path, tensor_size=vae_sample_size, is_mask=False, device=device, dtype=dtype) # Image to tensor
 with torch.no_grad():  # Transform image_tensor to latent space representation
-    latent_space_image = vae.encode(img_tensor).latent_dist.sample() * vae.config.scaling_factor
+    latent_original_image = vae.encode(img_tensor).latent_dist.sample() * vae.config.scaling_factor
 
-# Transform mask to latent space size torch tensor. Not using autoencoder.
-mask_latent_tensor = utils.image_to_tensor(image_path=mask_path, tensor_size=latent_sample_size, device=device, dtype=dtype)
+# Transform mask to latent space size binary torch tensor based on the masked region.
+mask_latent_tensor = utils.image_to_tensor(image_path=mask_path, tensor_size=latent_sample_size, is_mask=True, device=device, dtype=dtype)
 
-# 3) Each step apply multiplication between the mask and the diffusion step
-
-scheduler.set_timesteps(50)
-guidance_scale = 5 # Control the CFG. Higher values -> higher dependency on the prompt, more noise
+scheduler.set_timesteps(25)
+guidance_scale = 7 # Control the CFG. Higher values -> higher dependency on the prompt. values should be around 6-12.
 
 # Applying the diffusion iterations.
 for t in scheduler.timesteps:
@@ -86,6 +85,19 @@ for t in scheduler.timesteps:
     latents = scheduler.step(
         noise_pred, t, latents
     ).prev_sample
+
+    # ---- INPAINTING PART ----
+    # Forward-noise the original latent to the current timestep
+    # "Mimics" the noise at timestep t and apply it to the original image(in the tesnor latent repressentation)
+    alpha_prod_t = scheduler.alphas_cumprod[t]
+    noise = torch.randn_like(latents)
+    latents_original_image_noised = (
+        latent_original_image * alpha_prod_t.sqrt() +
+        noise * (1 - alpha_prod_t).sqrt()
+    )
+    
+    # Clamp known region. Note: '*' is elemnent-wise multiplication.
+    latents = mask_latent_tensor * latents_original_image_noised + (1 - mask_latent_tensor) * latents
 
 latents = latents / vae.config.scaling_factor
 

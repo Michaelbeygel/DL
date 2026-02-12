@@ -49,22 +49,30 @@ def create_pipeline_components(model_id, device, dtype):
 
     return components_dict
 
-def image_to_tensor(image_path, tensor_size, device, dtype):
+def image_to_tensor(image_path, tensor_size, is_mask, device, dtype):
     """
-    Transform image to a normalized tensor of size (1, 3, tensor_size, tensor_size).
+    Transfrom an image or mask to a tensor.
     
     :param image_path: Local path to image.
     :param tensor_size: Desired size of output tensor.
+    :param is_mask: True if the image is a mask.
     :param device: The device to move the tensor to ('cuda' or 'cpu').
     :param dtype: The torch dtype to cast the tensor to.
     """
-    transform = transforms.Compose([
-        transforms.Resize((tensor_size, tensor_size)),
-        transforms.ToTensor(),              # [0, 1], shape [Channels, Height, Width]
-        transforms.Normalize([0.5], [0.5])  # Normalize to cope with autoencoder value range
-    ])
-    img = Image.open(image_path).convert("RGB")
-    img_tensor = transform(img).unsqueeze(0)
+    # If the image is a mask, then create a tensor with 0-1 such that white->0, black->1
+    if is_mask:
+        img =  mask = Image.open(image_path).convert("L")  # "L" = single channel
+        img = img.resize((tensor_size, tensor_size))
+        img_tensor = transforms.ToTensor()(img)            # [1,H,W], values in [0,1]
+        img_tensor = (img_tensor < 0.5).float()            # Threshold to 0/1
+    else:
+        img = Image.open(image_path).convert("RGB")
+        transform = transforms.Compose([
+            transforms.Resize((tensor_size, tensor_size)),
+            transforms.ToTensor(),              # [0, 1], shape [Channels, Height, Width]
+            transforms.Normalize([0.5], [0.5])  # Normalize to cope with autoencoder value range
+        ])
+        img_tensor = transform(img).unsqueeze(0)
     img_tensor = img_tensor.to( # Move image_tensor to GPU, and transform to dtype = torch.float16
         device=device,
         dtype=dtype
