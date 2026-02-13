@@ -61,43 +61,56 @@ mask_latent_tensor = utils.image_to_tensor(image_path=mask_path, tensor_size=lat
 
 scheduler.set_timesteps(25)
 guidance_scale = 7 # Control the CFG. Higher values -> higher dependency on the prompt. Values should be around 6-12.
+sampling_steps = 15 # Number of sampling steps we will do each scheduler timestemp, as described in the RePaint paper.
 
 # Applying the diffusion iterations.
 for t in scheduler.timesteps:
-    # scale_model_input actually do nothing with current schedule, but is safer to use it anyway.
-    latent_model_input = scheduler.scale_model_input(latents, t) 
+    for u in range(1,sampling_steps+1):
+        latent_model_input = scheduler.scale_model_input(latents, t) # Note: scale_model_input actually do nothing with current schedule, but safer. 
 
-    with torch.no_grad():
-        noise_pred_text = unet(
-            latent_model_input,
-            t,
-            encoder_hidden_states=text_embeddings
-        ).sample
-        noise_pred_uncond = unet(
-            latent_model_input, 
-            t, 
-            encoder_hidden_states=uncond_embeddings
-        ).sample
+        with torch.no_grad():
+            noise_pred_text = unet(
+                latent_model_input,
+                t,
+                encoder_hidden_states=text_embeddings
+            ).sample
+            noise_pred_uncond = unet(
+                latent_model_input, 
+                t, 
+                encoder_hidden_states=uncond_embeddings
+            ).sample
 
-    # Apply Classifier Free Guidance
-    noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
+        # Apply Classifier Free Guidance
+        noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
 
-    latents = scheduler.step(
-        noise_pred, t, latents
-    ).prev_sample
+        latents = scheduler.step(
+            noise_pred, t, latents
+        ).prev_sample
 
-    # ---- INPAINTING PART ----
-    # Forward-noise the original latent to the current timestep
-    # "Mimics" the noise at timestep t and apply it to the original image(in the tesnor latent repressentation)
-    alpha_prod_t = scheduler.alphas_cumprod[t]
-    noise = torch.randn_like(latents)
-    latents_original_image_noised = (
-        latent_original_image * alpha_prod_t.sqrt() +
-        noise * (1 - alpha_prod_t).sqrt()
-    )
-    
-    # Clamp known region. Note: '*' is elemnent-wise multiplication.
-    latents = mask_latent_tensor * latents_original_image_noised + (1 - mask_latent_tensor) * latents
+        # ---- INPAINTING PART ----
+        # Forward-noise the original latent to the current timestep
+        # "Mimics" the noise at timestep t and apply it to the original image(in the tesnor latent repressentation)
+        alpha_prod_t = scheduler.alphas_cumprod[t]
+        noise = torch.randn_like(latents)
+        latents_original_image_noised = (
+            latent_original_image * alpha_prod_t.sqrt() +
+            noise * (1 - alpha_prod_t).sqrt()
+        )
+        
+        # Clamp known region. Note: '*' is elemnent-wise multiplication.
+        latents = mask_latent_tensor * latents_original_image_noised + (1 - mask_latent_tensor) * latents
+
+        # Apply RePaint's paper resampling technique(part 4.2 in the paper)
+        if u < sampling_steps and t > 1:
+            # Get the variance for the current step (beta)
+            # Note: Exact indexing depends on your specific diffusers scheduler setup
+            beta = scheduler.betas[t] 
+            
+            # Generate random Gaussian noise
+            noise = torch.randn_like(latents)
+            
+            # Analytically add the noise (Equation 1 from the paper)
+            latents = (1 - beta).sqrt() * latents + beta.sqrt() * noise
 
 latents = latents / vae.config.scaling_factor
 
