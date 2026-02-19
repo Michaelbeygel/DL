@@ -1,0 +1,3 @@
+## Run this command everytime you restart RunPod:
+
+source /workspace/miniconda3/etc/profile.d/conda.sh
