@@ -5,6 +5,7 @@ from torchvision import transforms
 from transformers import CLIPTokenizer, CLIPTextModel
 from diffusers import DDIMScheduler, AutoencoderKL, UNet2DConditionModel
 import torch
+import torch.nn as nn
 
 
 def create_pipeline_components(model_id, device, dtype):
@@ -14,6 +15,7 @@ def create_pipeline_components(model_id, device, dtype):
     The pipeline components will be:
     Tokenizer, Text Encoder, Unet, VAE, Scheduler.
     Return a dictionary of (name, element)
+
     :param model_id: The diffusion model in use.
     :param device: The device to run the models on.
     :param dtype: The torch dtype to use.
@@ -116,3 +118,33 @@ def get_text_embeddings(prompt, tokenizer, text_encoder, device):
     with torch.no_grad():
         embeddings = text_encoder(text_inputs.input_ids.to(device))[0]
     return embeddings
+
+# Latent loss for optimized latent space images.
+class LatentLoss(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def non_mask_preserve_loss(self, diffusion_latent, original_image_latent, mask):
+        """
+        Calculates the "non mask preserve loss", which is suppose to make the non-masked areas as similar to the given image latent.
+        The loss will be calculated as:
+
+            L_2^2[(diffusion_latent * mask) - (original_image_latent * mask)]
+
+        Where L_2^2 is the squered L_2 norm.
+        
+        :param diffusion_latent: The latnet space tensor of the current diffusion step.
+        :param original_image_latent: The latent space tensor of the given image.
+        :param mask: The binary latent space tensor of the mask.
+        :return: The value of the "non mask preserve loss".
+        """
+        
+        masked_diffusion_latent = diffusion_latent * mask
+        original_given_image_latent = original_image_latent * mask
+
+        masked_difference_latent = masked_diffusion_latent - original_given_image_latent
+        # Return the (L_2)^2 norm of the difference latent space representations.
+        return torch.sum(masked_difference_latent**2)
+
+    def forward(self, diffusion_latent, original_image_latent, mask):
+        return self.non_mask_preserve_loss(diffusion_latent, original_image_latent, mask)

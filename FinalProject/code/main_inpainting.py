@@ -1,8 +1,3 @@
-## Problems worth dealing with in current version:
-# 1) When transforming the latent instance back to feature space, we lose the specific values of the given image!
-#    That is because we are applying the given image noisy versions in the stable diffusion process in the latent space. 
-# 2) Apply continous mask, instead of a binary one.
-
 import torch
 from transformers import CLIPTokenizer, CLIPTextModel
 from diffusers import DDIMScheduler, AutoencoderKL, UNet2DConditionModel
@@ -12,14 +7,16 @@ import numpy as np
 from torchvision import transforms
 import utils
 
-# Set up device and dtype
+# Set up device, dtype and model 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 dtype = torch.float16
+model_id = "sd2-community/stable-diffusion-2-base"
 
 # Set up pathes
-model_id = "sd2-community/stable-diffusion-2-base"
-image_path = "../images/image01.jpg"
-mask_path = "../images/mask01.jpg"
+image_num = 1
+image_path = "../data/images/image0" + str(image_num) + ".jpg"
+mask_path = "../data/masks/mask0" + str(image_num) + ".jpg"
+saving_output_path = "../data/outputs/vanilla_outputs/inpaint0" + str(image_num) + ".jpg"
 
 # Set up pipeline components
 pipe_comp_dict = utils.create_pipeline_components(model_id, device, dtype)
@@ -28,6 +25,9 @@ text_encoder = pipe_comp_dict["text_encoder"]
 unet = pipe_comp_dict["unet"]
 vae = pipe_comp_dict["vae"]
 scheduler = pipe_comp_dict["scheduler"]
+
+# Set up loss function for latent space
+loss_fn = utils.LatentLoss()
 
 prompt = "A dog sitting, on grass. shot on a phone camera. trees and mountains in the background."
 
@@ -61,60 +61,52 @@ mask_latent_tensor = utils.image_to_tensor(image_path=mask_path, tensor_size=lat
 
 scheduler.set_timesteps(25)
 guidance_scale = 7 # Control the CFG. Higher values -> higher dependency on the prompt. Values should be around 6-12.
-sampling_steps = 15 # Number of sampling steps we will do each scheduler timestemp, as described in the RePaint paper.
+optimization_scale = 0.1
 
 # Applying the diffusion iterations.
 for t in scheduler.timesteps:
-    for u in range(1,sampling_steps+1):
-        latent_model_input = scheduler.scale_model_input(latents, t) # Note: scale_model_input actually do nothing with current schedule, but safer. 
+    latent_model_input = scheduler.scale_model_input(latents, t) # Note: scale_model_input actually do nothing with current schedule, but safer. 
 
-        with torch.no_grad():
-            noise_pred_text = unet(
-                latent_model_input,
-                t,
-                encoder_hidden_states=text_embeddings
-            ).sample
-            noise_pred_uncond = unet(
-                latent_model_input, 
-                t, 
-                encoder_hidden_states=uncond_embeddings
-            ).sample
+    with torch.no_grad():
+        noise_pred_text = unet(
+            latent_model_input,
+            t,
+            encoder_hidden_states=text_embeddings
+        ).sample
+        noise_pred_uncond = unet(
+            latent_model_input, 
+            t, 
+            encoder_hidden_states=uncond_embeddings
+        ).sample
 
-        # Apply Classifier Free Guidance
-        noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
+    # Apply Classifier Free Guidance
+    noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
 
-        latents = scheduler.step(
-            noise_pred, t, latents
-        ).prev_sample
+    latents = scheduler.step(
+        noise_pred, t, latents
+    ).prev_sample
 
-        # ---- INPAINTING PART ----
-        # Forward-noise the original latent to the current timestep
-        # "Mimics" the noise at timestep t and apply it to the original image(in the tesnor latent repressentation)
-        alpha_prod_t = scheduler.alphas_cumprod[t]
-        noise = torch.randn_like(latents)
-        latents_original_image_noised = (
-            latent_original_image * alpha_prod_t.sqrt() +
-            noise * (1 - alpha_prod_t).sqrt()
-        )
-        
-        # Clamp known region. Note: '*' is elemnent-wise multiplication.
-        latents = mask_latent_tensor * latents_original_image_noised + (1 - mask_latent_tensor) * latents
+    # Forward-noise the original latent to the current timestep t
+    alpha_prod_t = scheduler.alphas_cumprod[t]
+    noise = torch.randn_like(latents)
+    latents_original_image_noised = (
+        latent_original_image * alpha_prod_t.sqrt() +
+        noise * (1 - alpha_prod_t).sqrt()
+    )
+    
+    # Clamp known region. Note: '*' is elemnent-wise multiplication.
+    latents = mask_latent_tensor * latents_original_image_noised + (1 - mask_latent_tensor) * latents
 
-        # Apply RePaint's paper resampling technique(part 4.2 in the paper)
-        if u < sampling_steps and t > 1:
-            # Get the variance for the current step (beta)
-            # Note: Exact indexing depends on your specific diffusers scheduler setup
-            beta = scheduler.betas[t] 
-            
-            # Generate random Gaussian noise
-            noise = torch.randn_like(latents)
-            
-            # Analytically add the noise (Equation 1 from the paper)
-            latents = (1 - beta).sqrt() * latents + beta.sqrt() * noise
+    # Apply latent space optimization with the loss function
+    latents = latents.detach().requires_grad_(True)
+    loss = loss_fn(diffusion_latent=latents, original_image_latent=latents_original_image_noised, mask=mask_latent_tensor)
+    grad = torch.autograd.grad(loss, latents)[0]
+    latents = latents - optimization_scale * grad
+    latents = latents.detach()
 
 latents = latents / vae.config.scaling_factor
 
 with torch.no_grad():
     image = vae.decode(latents).sample
 
-utils.tensor_to_image(image_tensor=image, saving_path="generated.png")
+utils.tensor_to_image(image_tensor=image, saving_path=saving_output_path)

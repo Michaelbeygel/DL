@@ -12,13 +12,13 @@ import numpy as np
 from torchvision import transforms
 import utils
 
-# Set up device and dtype
+# Set up device, dtype and model 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 dtype = torch.float16
+model_id = "sd2-community/stable-diffusion-2-base"
 
 # Set up pathes
 image_num = 1
-model_id = "sd2-community/stable-diffusion-2-base"
 image_path = "../data/images/image0" + str(image_num) + ".jpg"
 mask_path = "../data/masks/mask0" + str(image_num) + ".jpg"
 saving_output_path = "../data/outputs/vanilla_outputs/inpaint0" + str(image_num) + ".jpg"
