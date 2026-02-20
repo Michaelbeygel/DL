@@ -17,9 +17,11 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 dtype = torch.float16
 
 # Set up pathes
+image_num = 1
 model_id = "sd2-community/stable-diffusion-2-base"
-image_path = "../images/image01.jpg"
-mask_path = "../images/mask01.jpg"
+image_path = "../data/images/image0" + str(image_num) + ".jpg"
+mask_path = "../data/masks/mask0" + str(image_num) + ".jpg"
+saving_output_path = "../data/outputs/vanilla_outputs/inpaint0" + str(image_num) + ".jpg"
 
 # Set up pipeline components
 pipe_comp_dict = utils.create_pipeline_components(model_id, device, dtype)
@@ -64,8 +66,7 @@ guidance_scale = 7 # Control the CFG. Higher values -> higher dependency on the 
 
 # Applying the diffusion iterations.
 for t in scheduler.timesteps:
-    # scale_model_input actually do nothing with current schedule, but is safer to use it anyway.
-    latent_model_input = scheduler.scale_model_input(latents, t) 
+    latent_model_input = scheduler.scale_model_input(latents, t) # Note: scale_model_input actually do nothing with current schedule, but safer. 
 
     with torch.no_grad():
         noise_pred_text = unet(
@@ -104,4 +105,4 @@ latents = latents / vae.config.scaling_factor
 with torch.no_grad():
     image = vae.decode(latents).sample
 
-utils.tensor_to_image(image_tensor=image, saving_path="generated.png")
+utils.tensor_to_image(image_tensor=image, saving_path=saving_output_path)
