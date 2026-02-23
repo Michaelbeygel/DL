@@ -1,3 +1,7 @@
+# Idea - we want to get the orginial latent representations correct, so that they will construct correct images.
+# We could do forword and backword sampling to get better values. We could apply that one after another with the 
+# optimization somehow.
+
 import torch
 from transformers import CLIPTokenizer, CLIPTextModel
 from diffusers import DDIMScheduler, AutoencoderKL, UNet2DConditionModel
@@ -65,8 +69,8 @@ mask_latent_tensor = utils.image_to_tensor(image_path=mask_path, tensor_size=lat
 
 scheduler.set_timesteps(25)
 guidance_scale = 7 # Control the CFG. Higher values -> higher dependency on the prompt. Values should be around 6-12.
-optimization_scale = 0.05
-num_of_gd_iterations = 3
+optimization_scale = 0.5
+num_of_gd_iterations = 50
 num_of_optimizations = 15
 
 # Applying the diffusion iterations.
@@ -100,9 +104,6 @@ for t in scheduler.timesteps:
         noise * (1 - alpha_prod_t).sqrt()
     )
     
-    # Clamp known region. Note: '*' is elemnent-wise multiplication.
-    latents = mask_latent_tensor * latents_original_image_noised + (1 - mask_latent_tensor) * latents
-
     # Apply latent space optimization with the loss function
     if num_of_optimizations > 0:
         num_of_optimizations -= 1
@@ -113,6 +114,10 @@ for t in scheduler.timesteps:
             with torch.no_grad():
                 latents = latents - optimization_scale * grad
             latents = latents.detach()
+    else:
+        # Clamp known region. Note: '*' is elemnent-wise multiplication.
+        latents = mask_latent_tensor * latents_original_image_noised + (1 - mask_latent_tensor) * latents
+
 
 latents = latents / vae.config.scaling_factor
 
