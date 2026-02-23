@@ -13,7 +13,7 @@ dtype = torch.float16
 model_id = "sd2-community/stable-diffusion-2-base"
 
 # Set up pathes
-image_num = 7
+image_num = 1
 image_path = "../data/images/image0" + str(image_num) + ".jpg"
 mask_path = "../data/masks/mask0" + str(image_num) + ".jpg"
 saving_output_path = "../data/outputs/main_outputs/inpaint0" + str(image_num) + ".jpg"
@@ -66,6 +66,7 @@ mask_latent_tensor = utils.image_to_tensor(image_path=mask_path, tensor_size=lat
 scheduler.set_timesteps(25)
 guidance_scale = 7 # Control the CFG. Higher values -> higher dependency on the prompt. Values should be around 6-12.
 optimization_scale = 0.1
+num_of_gd_iterations = 3
 
 # Applying the diffusion iterations.
 for t in scheduler.timesteps:
@@ -102,11 +103,13 @@ for t in scheduler.timesteps:
     latents = mask_latent_tensor * latents_original_image_noised + (1 - mask_latent_tensor) * latents
 
     # Apply latent space optimization with the loss function
-    latents = latents.detach().requires_grad_(True)
-    loss = loss_fn(diffusion_latent=latents, original_image_latent=latents_original_image_noised, mask=mask_latent_tensor)
-    grad = torch.autograd.grad(loss, latents)[0]
-    latents = latents - optimization_scale * grad
-    latents = latents.detach()
+    for _ in range(num_of_gd_iterations):
+        latents = latents.detach().requires_grad_(True)
+        loss = loss_fn(diffusion_latent=latents, original_image_latent=latents_original_image_noised, mask=mask_latent_tensor)
+        grad = torch.autograd.grad(loss, latents)[0]
+        with torch.no_grad():
+            latents = latents - optimization_scale * grad
+        latents = latents.detach()
 
 latents = latents / vae.config.scaling_factor
 
