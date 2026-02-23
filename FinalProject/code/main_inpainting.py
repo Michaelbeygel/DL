@@ -13,10 +13,15 @@ dtype = torch.float16
 model_id = "sd2-community/stable-diffusion-2-base"
 
 # Set up pathes
-image_num = 1
+image_num = 7
 image_path = "../data/images/image0" + str(image_num) + ".jpg"
 mask_path = "../data/masks/mask0" + str(image_num) + ".jpg"
 saving_output_path = "../data/outputs/main_outputs/inpaint0" + str(image_num) + ".jpg"
+
+with open("../data/prompts.txt", "r") as f:
+    prompts = f.read().splitlines()
+
+prompt = prompts[image_num-1]
 
 # Set up pipeline components
 pipe_comp_dict = utils.create_pipeline_components(model_id, device, dtype)
@@ -29,7 +34,6 @@ scheduler = pipe_comp_dict["scheduler"]
 # Set up loss function for latent space
 loss_fn = utils.LatentLoss()
 
-prompt = "A dog sitting, on grass. shot on a phone camera. trees and mountains in the background."
 
 # Embedd the prompt. workflow: prompt -> tokens -> embedding
 text_embeddings = utils.get_text_embeddings(prompt, tokenizer,text_encoder, device)

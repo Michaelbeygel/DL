@@ -23,6 +23,11 @@ image_path = "../data/images/image0" + str(image_num) + ".jpg"
 mask_path = "../data/masks/mask0" + str(image_num) + ".jpg"
 saving_output_path = "../data/outputs/vanilla_outputs/inpaint0" + str(image_num) + ".jpg"
 
+with open("../data/prompts.txt", "r") as f:
+    prompts = f.read().splitlines()
+
+prompt = prompts[image_num-1]
+
 # Set up pipeline components
 pipe_comp_dict = utils.create_pipeline_components(model_id, device, dtype)
 tokenizer = pipe_comp_dict["tokenizer"]
@@ -30,8 +35,6 @@ text_encoder = pipe_comp_dict["text_encoder"]
 unet = pipe_comp_dict["unet"]
 vae = pipe_comp_dict["vae"]
 scheduler = pipe_comp_dict["scheduler"]
-
-prompt = "A dog sitting, on grass. shot on a phone camera. trees and mountains in the background."
 
 # Embedd the prompt. workflow: prompt -> tokens -> embedding
 text_embeddings = utils.get_text_embeddings(prompt, tokenizer,text_encoder, device)
