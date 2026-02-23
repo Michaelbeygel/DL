@@ -16,7 +16,7 @@ model_id = "sd2-community/stable-diffusion-2-base"
 image_num = 1
 image_path = "../data/images/image0" + str(image_num) + ".jpg"
 mask_path = "../data/masks/mask0" + str(image_num) + ".jpg"
-saving_output_path = "../data/outputs/vanilla_outputs/inpaint0" + str(image_num) + ".jpg"
+saving_output_path = "../data/outputs/main_outputs/inpaint0" + str(image_num) + ".jpg"
 
 # Set up pipeline components
 pipe_comp_dict = utils.create_pipeline_components(model_id, device, dtype)
