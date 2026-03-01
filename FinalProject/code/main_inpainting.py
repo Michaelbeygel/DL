@@ -44,7 +44,6 @@ scheduler = pipe_comp_dict["scheduler"]
 # Set up loss function for latent space
 loss_fn = utils.LatentLoss()
 
-
 # Embedd the prompt. workflow: prompt -> tokens -> embedding
 text_embeddings = utils.get_text_embeddings(prompt, tokenizer,text_encoder, device)
 # Embedd an empty prompt for the Classifier Free Guidance
@@ -79,6 +78,10 @@ optimization_scale = 0.5
 num_of_gd_iterations = 50
 num_of_optimizations = 15
 
+# Generate noise once with fixed seed for reproducible inpainting
+torch.manual_seed(0)  # Set seed for reproducibility
+noise = torch.randn_like(latents)
+
 # Applying the diffusion iterations.
 for t in scheduler.timesteps:
     latent_model_input = scheduler.scale_model_input(latents, t) # Note: scale_model_input actually do nothing with current schedule, but safer. 
@@ -104,7 +107,6 @@ for t in scheduler.timesteps:
 
     # Forward-noise the original latent to the current timestep t
     alpha_prod_t = scheduler.alphas_cumprod[t]
-    noise = torch.randn_like(latents)
     latents_original_image_noised = (
         latent_original_image * alpha_prod_t.sqrt() +
         noise * (1 - alpha_prod_t).sqrt()

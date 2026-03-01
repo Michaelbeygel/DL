@@ -18,7 +18,7 @@ dtype = torch.float16
 model_id = "sd2-community/stable-diffusion-2-base"
 
 # Set up pathes
-image_num = 1
+image_num = 7
 image_path = "../data/images/image0" + str(image_num) + ".jpg"
 mask_path = "../data/masks/mask0" + str(image_num) + ".jpg"
 saving_output_path = "../data/outputs/vanilla_outputs/inpaint0" + str(image_num) + ".jpg"
@@ -67,6 +67,10 @@ mask_latent_tensor = utils.image_to_tensor(image_path=mask_path, tensor_size=lat
 scheduler.set_timesteps(25)
 guidance_scale = 7 # Control the CFG. Higher values -> higher dependency on the prompt. Values should be around 6-12.
 
+# Generate noise once with fixed seed for reproducible inpainting
+torch.manual_seed(0)  # Set seed for reproducibility
+noise = torch.randn_like(latents)
+
 # Applying the diffusion iterations.
 for t in scheduler.timesteps:
     latent_model_input = scheduler.scale_model_input(latents, t) # Note: scale_model_input actually do nothing with current schedule, but safer. 
@@ -93,8 +97,7 @@ for t in scheduler.timesteps:
     # ---- INPAINTING PART ----
     # Forward-noise the original latent to the current timestep
     # "Mimics" the noise at timestep t and apply it to the original image(in the tesnor latent repressentation)
-    alpha_prod_t = scheduler.alphas_cumprod[t]
-    noise = torch.randn_like(latents)
+    alpha_prod_t = scheduler.alphas_cumprod[t].to(dtype=dtype)
     latents_original_image_noised = (
         latent_original_image * alpha_prod_t.sqrt() +
         noise * (1 - alpha_prod_t).sqrt()
