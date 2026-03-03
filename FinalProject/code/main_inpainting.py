@@ -106,10 +106,10 @@ for t in scheduler.timesteps:
     ).prev_sample
 
     # Forward-noise the original latent to the current timestep t
-    alpha_prod_t = scheduler.alphas_cumprod[t]
-    latents_original_image_noised = (
-        latent_original_image * alpha_prod_t.sqrt() +
-        noise * (1 - alpha_prod_t).sqrt()
+    latents_original_image_noised = scheduler.add_noise(
+        latent_original_image,
+        noise,
+        t
     )
     
     # Apply latent space optimization with the loss function

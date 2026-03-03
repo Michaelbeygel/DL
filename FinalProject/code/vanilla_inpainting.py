@@ -97,10 +97,10 @@ for t in scheduler.timesteps:
     # ---- INPAINTING PART ----
     # Forward-noise the original latent to the current timestep
     # "Mimics" the noise at timestep t and apply it to the original image(in the tesnor latent repressentation)
-    alpha_prod_t = scheduler.alphas_cumprod[t].to(dtype=dtype)
-    latents_original_image_noised = (
-        latent_original_image * alpha_prod_t.sqrt() +
-        noise * (1 - alpha_prod_t).sqrt()
+    latents_original_image_noised = scheduler.add_noise(
+        latent_original_image,
+        noise,
+        t
     )
     
     # Clamp known region. Note: '*' is elemnent-wise multiplication.
