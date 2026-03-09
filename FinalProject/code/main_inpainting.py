@@ -45,12 +45,22 @@ uncond_embeddings = utils.get_text_embeddings("", tokenizer,text_encoder, device
 
 # Create a list of size 'num_of_inpaintings' of images. 
 images = []
-num_of_inpaintings = 1
+num_of_inpaintings = 4
+
+# Set up a mask scheduler. This will help us change masks throughout the iterations of the pipeline.
+timestemps = 25
+latent_sample_size = unet.config.sample_size
+mask_scheduler = utils.MaskScheduler(
+    timestemps=timestemps, 
+    mask_path=mask_path, 
+    tensor_size=latent_sample_size,
+    device=device,
+    dtype=dtype
+)
 
 for inpaint_iteration in range(num_of_inpaintings):
     # Sample random latent space data
     batch_size = 1
-    latent_sample_size = unet.config.sample_size
     latents = torch.randn(
         (
             batch_size,
@@ -69,12 +79,11 @@ for inpaint_iteration in range(num_of_inpaintings):
     with torch.no_grad():  # Transform image_tensor to latent space representation
         latent_original_image = vae.encode(img_tensor).latent_dist.sample() * vae.config.scaling_factor
 
-    # Transform mask to latent space size binary torch tensor based on the masked region.
-    mask_latent, mask_edge_latent = utils.mask_to_tensor(mask_path=mask_path, tensor_size=latent_sample_size, blur_radius=0, mask_shrink=0, device=device, dtype=dtype)
+    # # Transform mask to latent space size binary torch tensor based on the masked region.
+    # mask_latent, mask_edge_latent = utils.mask_to_tensor(mask_path=mask_path, tensor_size=latent_sample_size, blur_radius=0, mask_shrink=0, device=device, dtype=dtype)
 
-    scheduler.set_timesteps(25)
+    scheduler.set_timesteps(timestemps)
     guidance_scale = 7 # Control the CFG. Higher values -> higher dependency on the prompt. Values should be around 6-12.
-    optimization_scale = 0.5
 
     noise = torch.randn_like(latents)
 
@@ -110,7 +119,10 @@ for inpaint_iteration in range(num_of_inpaintings):
             t
         )
         
-        gamma = 0.005
+        mask_latent, mask_edge_latent = mask_scheduler.get_masks(inpaint_iteration, i)
+        optimization_scale = mask_scheduler.get_optimization_scale(inpaint_iteration, i)
+        gamma = mask_scheduler.get_gamma(inpaint_iteration, i)
+
         # Apply latent space optimization with the loss function
         latents = latents.detach().requires_grad_(True)
         loss = loss_fn(
@@ -120,28 +132,17 @@ for inpaint_iteration in range(num_of_inpaintings):
             mask=mask_latent,
             mask_edge=mask_edge_latent
         )
-
-        loss_before = loss
-
         grad = torch.autograd.grad(loss, latents)[0]
         with torch.no_grad():
             latents = latents - optimization_scale * grad
-
-        # ----- loss after step -----
-        latents_updated = latents
-        loss_after = loss_fn(
-            gamma=gamma,
-            diffusion_latent=latents_updated,
-            original_image_latent=latents_original_image_noised,
-            mask=mask_latent,
-            mask_edge=mask_edge_latent
-        )
-
-        print(f"Loss before: {loss_before.item():.6f}")
-        print(f"Loss after : {loss_after.item():.6f}")
-        print(f"Improvement: {(loss_before - loss_after).item():.6f}")
         
         latents = latents.detach()
+
+        with torch.no_grad():
+            image = vae.decode(latents  / vae.config.scaling_factor).sample
+
+        image = utils.tensor_to_image(image_tensor=image)
+        image.save("../data/outputs/main_outputs/" + str(i) + "_sample.jpg")
 
     latents = latents / vae.config.scaling_factor
 

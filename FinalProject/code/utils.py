@@ -57,7 +57,7 @@ def create_pipeline_components(model_id, device, dtype):
 
     return components_dict
 
-def get_paths(image_num):
+def get_paths(image_num, is_vanilla):
     """
     Returns the paths for the image, mask and output.
 
@@ -65,7 +65,10 @@ def get_paths(image_num):
     """
     image_path = f"../data/images/image{image_num:02d}.jpg"
     mask_path = f"../data/masks/mask{image_num:02d}.jpg"
-    output_path = f"../data/outputs/main_outputs/inpaint{image_num:02d}.jpg"
+    if is_vanilla:
+        output_path = f"../data/outputs/vanilla_outputs/inpaint{image_num:02d}.jpg"    
+    else:
+        output_path = f"../data/outputs/main_outputs/inpaint{image_num:02d}.jpg"
 
     return image_path, mask_path, output_path
 
@@ -131,32 +134,34 @@ def mask_to_tensor(mask_path, tensor_size, blur_radius, mask_shrink, device, dty
         else:
             mask = mask.filter(ImageFilter.MaxFilter(filter_size))  # expand white
 
-    mask.save("blurred_mask.jpg")
+    mask_tensor = transforms.ToTensor()(mask)            # [1,H,W], values in [0,1]
+    mask_tensor = 1.0 - mask_tensor
+    mask_tensor = mask_tensor.to( # Move mask_tensor to GPU, and transform to dtype
+        device=device,
+        dtype=dtype
+    )
+    return mask_tensor
+
+def get_edge_mask(mask_path, tensor_size, edge_boundry_size, device, dtype):
+    # Create a tensor with 0-1 such that white->0, black->1
+    mask = Image.open(mask_path).convert("L")  # "L" = single channel
+    mask = mask.resize((tensor_size, tensor_size))
 
     mask_tensor = transforms.ToTensor()(mask)            # [1,H,W], values in [0,1]
     mask_tensor = 1.0 - mask_tensor
-    mask_tensor = mask_tensor.to( # Move mask_tensor to GPU, and transform to dtype = torch.float16
+    mask_tensor = mask_tensor.to( # Move mask_tensor to GPU, and transform to dtype
         device=device,
         dtype=dtype
     )
 
     # Calculate the edges mask
-    boundary_size = 2
-    kernel_size = boundary_size * 2 + 1
-    big_mask = F.max_pool2d(mask_tensor, kernel_size=kernel_size, stride=1, padding=boundary_size)
-    small_mask = -F.max_pool2d(-mask_tensor, kernel_size=kernel_size, stride=1, padding=boundary_size)
+    kernel_size = edge_boundry_size * 2 + 1
+    big_mask = F.max_pool2d(mask_tensor, kernel_size=kernel_size, stride=1, padding=edge_boundry_size)
+    small_mask = -F.max_pool2d(-mask_tensor, kernel_size=kernel_size, stride=1, padding=edge_boundry_size)
     edge_mask = big_mask - small_mask
 
-    # Save edge_mask to image
-    edge_to_save = edge_mask.detach().float().cpu()
+    return edge_mask
 
-    # Normalize for visualization (optional but recommended)
-    edge_to_save = edge_to_save.clamp(0, 1)
-
-    edge_image = transforms.ToPILImage()(edge_to_save.squeeze(0))
-    edge_image.save("mask_edge.jpg")
-    
-    return mask_tensor, edge_mask
 
 def tensor_to_image(image_tensor):
     """
@@ -235,8 +240,6 @@ class LatentLoss(nn.Module):
     def forward(self, gamma, diffusion_latent, original_image_latent, mask, mask_edge):
         non_mask_loss = self.non_mask_preserve_loss(diffusion_latent, original_image_latent, mask)
         total_variation_loss = self.mask_edge_total_variation_loss(latent=diffusion_latent, mask_edge=mask_edge)
-        print("total_variation_loss = " + str(total_variation_loss))
-        print("non_mask_loss = " + str(non_mask_loss))
         loss = non_mask_loss + gamma * total_variation_loss
         return loss
 
@@ -293,7 +296,6 @@ def image_fill_mask_boundary_average(image_path, mask_path, tensor_size, blur_ra
     result = np.clip(result, 0, 255).astype(np.uint8)
 
     img = Image.fromarray(result)
-    img.save("filled_output.jpg")
 
     transform = transforms.Compose([
         transforms.ToTensor(),
@@ -319,8 +321,35 @@ class CLIPScore(nn.Module):
         inputs = self.processor(text=text_prompt, images=image, return_tensors="pt", padding=True).to(self.device)
         outputs = self.model(**inputs)
         logits_per_image = outputs.logits_per_image # this is the image-text similarity score
-        print(logits_per_image.sum().item())
-        # print(logits_per_image)
-        # probs = logits_per_image.softmax(dim=1) # we can take the softmax to get the label probabilities
-        # # print(probs)
         return logits_per_image.sum().item()
+
+class MaskScheduler():
+    def __init__(self, timestemps, mask_path, tensor_size, device, dtype):
+        self.timestemps = timestemps
+        self.device = device
+        self.dtype = dtype
+        self.start_phase_treshold = 12
+        self.regular_mask = mask_to_tensor(mask_path=mask_path, tensor_size=tensor_size, blur_radius=0, mask_shrink=0, device=device, dtype=dtype)
+        self.edge_mask = get_edge_mask(mask_path=mask_path, tensor_size=tensor_size, edge_boundry_size=1, device=device, dtype=dtype)
+        # Fill the masks_list variable with multiple masks
+        masks_variables = [ # The first element corresponds to 'blur_radius' and the second to 'mask_shrink'
+            [0,3], [0,2], [0,2], [0,1], [0,1]
+        ]
+        self.masks_list = []
+        for blur_radius, mask_shrink in masks_variables:
+            self.masks_list.append(mask_to_tensor(mask_path=mask_path, tensor_size=tensor_size, blur_radius=blur_radius, mask_shrink=mask_shrink, device=device, dtype=dtype))
+        
+    def get_masks(self, inpaint_iteration, i):
+        if i > self.start_phase_treshold:
+            return self.regular_mask, self.edge_mask
+        return self.masks_list[inpaint_iteration], self.edge_mask
+
+    def get_optimization_scale(self, inpaint_iteration, i):
+        if i < self.start_phase_treshold:
+            return 0.7
+        return 0.4
+
+    def get_gamma(self, inpaint_iteration, i):
+        if i < self.start_phase_treshold:
+            return 0.01
+        return 0.005
