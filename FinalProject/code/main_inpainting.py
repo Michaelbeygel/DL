@@ -1,7 +1,3 @@
-# Idea - we want to get the orginial latent representations correct, so that they will construct correct images.
-# We could do forword and backword sampling to get better values. We could apply that one after another with the 
-# optimization somehow.
-
 import torch
 from transformers import CLIPTokenizer, CLIPTextModel
 from diffusers import DDIMScheduler, AutoencoderKL, UNet2DConditionModel
@@ -25,7 +21,7 @@ dtype = torch.float16
 model_id = "sd2-community/stable-diffusion-2-base"
 
 # Set up data pathes
-image_path, mask_path, saving_output_path = utils.get_paths(image_num)
+image_path, mask_path, saving_output_path = utils.get_paths(image_num=image_num, is_vanilla=False)
 
 # Get prompt number 'image_num' from "prompts.txt" file.  
 prompt = utils.get_prompt(image_num)
@@ -45,7 +41,7 @@ uncond_embeddings = utils.get_text_embeddings("", tokenizer,text_encoder, device
 
 # Create a list of size 'num_of_inpaintings' of images. 
 images = []
-num_of_inpaintings = 4
+num_of_inpaintings = 5
 
 # Set up a mask scheduler. This will help us change masks throughout the iterations of the pipeline.
 timestemps = 25
@@ -57,6 +53,9 @@ mask_scheduler = utils.MaskScheduler(
     device=device,
     dtype=dtype
 )
+
+scheduler.set_timesteps(timestemps)
+guidance_scale = 7 # Control the CFG. Higher values -> higher dependency on the prompt. Values should be around 6-12.
 
 for inpaint_iteration in range(num_of_inpaintings):
     # Sample random latent space data
@@ -79,12 +78,7 @@ for inpaint_iteration in range(num_of_inpaintings):
     with torch.no_grad():  # Transform image_tensor to latent space representation
         latent_original_image = vae.encode(img_tensor).latent_dist.sample() * vae.config.scaling_factor
 
-    # # Transform mask to latent space size binary torch tensor based on the masked region.
-    # mask_latent, mask_edge_latent = utils.mask_to_tensor(mask_path=mask_path, tensor_size=latent_sample_size, blur_radius=0, mask_shrink=0, device=device, dtype=dtype)
-
-    scheduler.set_timesteps(timestemps)
-    guidance_scale = 7 # Control the CFG. Higher values -> higher dependency on the prompt. Values should be around 6-12.
-
+    # Sample noise to add to the original image latent
     noise = torch.randn_like(latents)
 
     # Applying the diffusion iterations.
@@ -119,6 +113,7 @@ for inpaint_iteration in range(num_of_inpaintings):
             t
         )
         
+        # Get loop variables value from the 'mask_scheduler'.
         mask_latent, mask_edge_latent = mask_scheduler.get_masks(inpaint_iteration, i)
         optimization_scale = mask_scheduler.get_optimization_scale(inpaint_iteration, i)
         gamma = mask_scheduler.get_gamma(inpaint_iteration, i)
@@ -138,21 +133,13 @@ for inpaint_iteration in range(num_of_inpaintings):
         
         latents = latents.detach()
 
-        with torch.no_grad():
-            image = vae.decode(latents  / vae.config.scaling_factor).sample
-
-        image = utils.tensor_to_image(image_tensor=image)
-        image.save("../data/outputs/main_outputs/" + str(i) + "_sample.jpg")
-
+    # Append 'decode(latents)' to images list.
     latents = latents / vae.config.scaling_factor
-
     with torch.no_grad():
-        image = vae.decode(latents).sample
-
+        image = vae.decode(latents ).sample
     image = utils.tensor_to_image(image_tensor=image)
     images.append(image)
-    image.save("../data/outputs/main_outputs/inpaint0" + str(image_num) + str(inpaint_iteration) + ".jpg")
-
+# Choose image with maximal CLIP score
 clip_score = utils.CLIPScore(device, dtype)
 CLIP_scores = [clip_score.CLIP_score(img, prompt) for img in images]
 best_index = CLIP_scores.index(max(CLIP_scores))
