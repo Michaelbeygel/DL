@@ -13,6 +13,8 @@ import argparse
 import utils
 import torch.nn.functional as F
 
+# TODO: make the pipline functuin (source_img, mask_img, prompt) -> genereated img
+
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description="Run inpainting with specified image number")
 parser.add_argument("--image_num", type=int, default=1, help="Image number to process (default: 1)")
