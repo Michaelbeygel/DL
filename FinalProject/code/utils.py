@@ -353,3 +353,25 @@ class MaskScheduler():
         if i < self.start_phase_treshold:
             return 0.01
         return 0.005
+        
+class InpaintingEvaluator:
+    def __init__(self, device):
+        # LPIPS for perceptual similarity (standard 'alex' net)
+        self.lpips_metric = LearnedPerceptualImagePatchSimilarity(net_type='alex').to(device)
+        # PSNR for pixel-level reconstruction fidelity
+        self.psnr_metric = PeakSignalNoiseRatio(data_range=1.0).to(device)
+
+    def evaluate(self, generated_tensor, target_tensor):
+        """
+        :param generated_tensor: VAE output (B, C, H, W) in [-1, 1]
+        :param target_tensor: Ground truth (B, C, H, W) in [-1, 1]
+        """
+        # LPIPS works on [-1, 1]
+        lpips_score = self.lpips_metric(generated_tensor, target_tensor)
+        
+        # PSNR works on [0, 1]
+        gen_01 = (generated_tensor / 2.0 + 0.5).clamp(0, 1)
+        tar_01 = (target_tensor / 2.0 + 0.5).clamp(0, 1)
+        psnr_score = self.psnr_metric(gen_01, tar_01)
+        
+        return {"LPIPS": lpips_score.item(), "PSNR": psnr_score.item()}
