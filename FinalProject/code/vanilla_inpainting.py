@@ -1,8 +1,3 @@
-## Problems worth dealing with in current version:
-# 1) When transforming the latent instance back to feature space, we lose the specific values of the given image!
-#    That is because we are applying the given image noisy versions in the stable diffusion process in the latent space. 
-# 2) Apply continous mask, instead of a binary one.
-
 import torch
 from transformers import CLIPTokenizer, CLIPTextModel
 from diffusers import DDIMScheduler, AutoencoderKL, UNet2DConditionModel
@@ -17,24 +12,17 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 dtype = torch.float16
 model_id = "sd2-community/stable-diffusion-2-base"
 
-# Set up pathes
-image_num = 7
-image_path = "../data/images/image0" + str(image_num) + ".jpg"
-mask_path = "../data/masks/mask0" + str(image_num) + ".jpg"
-saving_output_path = "../data/outputs/vanilla_outputs/inpaint0" + str(image_num) + ".jpg"
+# Set up data pathes
+image_num = 1
+image_path, mask_path, saving_output_path = utils.get_paths(image_num=image_num, is_vanilla=True)
 
-with open("../data/prompts.txt", "r") as f:
-    prompts = f.read().splitlines()
-
-prompt = prompts[image_num-1]
+# Get prompt number 'image_num' from "prompts.txt" file.  
+prompt = utils.get_prompt(image_num)
 
 # Set up pipeline components
-pipe_comp_dict = utils.create_pipeline_components(model_id, device, dtype)
-tokenizer = pipe_comp_dict["tokenizer"]
-text_encoder = pipe_comp_dict["text_encoder"]
-unet = pipe_comp_dict["unet"]
-vae = pipe_comp_dict["vae"]
-scheduler = pipe_comp_dict["scheduler"]
+pipe = utils.create_pipeline_components(model_id, device, dtype)
+tokenizer, text_encoder = pipe["tokenizer"], pipe["text_encoder"]
+unet, vae, scheduler = pipe["unet"], pipe["vae"], pipe["scheduler"]
 
 # Embedd the prompt. workflow: prompt -> tokens -> embedding
 text_embeddings = utils.get_text_embeddings(prompt, tokenizer,text_encoder, device)
@@ -57,19 +45,15 @@ latents = torch.randn(
 
 # Transform image to torch tensor and then to latent space
 vae_sample_size = vae.config.sample_size #  size of feature space
-img_tensor = utils.image_to_tensor(image_path=image_path, tensor_size=vae_sample_size, is_mask=False, device=device, dtype=dtype) # Image to tensor
+img_tensor = utils.image_to_tensor(image_path=image_path, tensor_size=vae_sample_size, device=device, dtype=dtype) # Image to tensor
 with torch.no_grad():  # Transform image_tensor to latent space representation
     latent_original_image = vae.encode(img_tensor).latent_dist.sample() * vae.config.scaling_factor
 
 # Transform mask to latent space size binary torch tensor based on the masked region.
-mask_latent_tensor = utils.image_to_tensor(image_path=mask_path, tensor_size=latent_sample_size, is_mask=True, device=device, dtype=dtype)
+mask_latent_tensor = utils.mask_to_tensor(mask_path=mask_path, tensor_size=latent_sample_size, blur_radius=0, mask_shrink=0, device=device, dtype=dtype)
 
 scheduler.set_timesteps(25)
 guidance_scale = 7 # Control the CFG. Higher values -> higher dependency on the prompt. Values should be around 6-12.
-
-# Generate noise once with fixed seed for reproducible inpainting
-torch.manual_seed(0)  # Set seed for reproducibility
-noise = torch.randn_like(latents)
 
 # Applying the diffusion iterations.
 for t in scheduler.timesteps:
@@ -97,6 +81,7 @@ for t in scheduler.timesteps:
     # ---- INPAINTING PART ----
     # Forward-noise the original latent to the current timestep
     # "Mimics" the noise at timestep t and apply it to the original image(in the tesnor latent repressentation)
+    noise = torch.randn_like(latents)
     latents_original_image_noised = scheduler.add_noise(
         latent_original_image,
         noise,
@@ -111,4 +96,5 @@ latents = latents / vae.config.scaling_factor
 with torch.no_grad():
     image = vae.decode(latents).sample
 
-utils.tensor_to_image(image_tensor=image, saving_path=saving_output_path)
+image = utils.tensor_to_image(image_tensor=image)
+image.save(saving_output_path)
