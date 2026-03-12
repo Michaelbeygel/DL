@@ -52,3 +52,4 @@ def run_inpainting_batch(script_type="main", image_nums=range(1, 7)):
 if __name__ == "__main__":
     script_type = sys.argv[1] if len(sys.argv) > 1 else "main"
     run_inpainting_batch(script_type=script_type)
+    # Bug: we load CLIP model every time 
