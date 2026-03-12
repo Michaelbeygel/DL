@@ -5,7 +5,14 @@ from diffusers.utils import load_image
 from PIL import Image
 import numpy as np
 from torchvision import transforms
+import argparse
 import utils
+
+# Parse command-line arguments
+parser = argparse.ArgumentParser(description="Run inpainting with specified image number")
+parser.add_argument("--image_num", type=int, default=1, help="Image number to process (default: 1)")
+args = parser.parse_args()
+image_num = args.image_num
 
 # Set up device, dtype and model 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -13,7 +20,6 @@ dtype = torch.float16
 model_id = "sd2-community/stable-diffusion-2-base"
 
 # Set up data pathes
-image_num = 1
 image_path, mask_path, saving_output_path = utils.get_paths(image_num=image_num, is_vanilla=True)
 
 # Get prompt number 'image_num' from "prompts.txt" file.  

@@ -1,22 +1,31 @@
 #!/usr/bin/env python3
 """
-Batch runner for main_inpainting.py with multiple image numbers
+Batch runner for inpainting scripts with multiple image numbers
 """
 import subprocess
 import sys
 from pathlib import Path
 
-def run_inpainting_batch(image_nums=range(1, 8)):
+def run_inpainting_batch(script_type="main", image_nums=range(1, 7)):
     """
-    Run main_inpainting.py for multiple image numbers.
+    Run vanilla_inpainting.py or main_inpainting.py for multiple image numbers.
     
     Args:
-        image_nums: Iterable of image numbers to process (default: 1-7)
+        script_type: Either "vanilla" or "main" (default: "main")
+        image_nums: Iterable of image numbers to process (default: 1-6)
     """
-    main_script = Path(__file__).parent / "main_inpainting.py"
+    if script_type == "vanilla":
+        script_name = "vanilla_inpainting.py"
+    elif script_type == "main":
+        script_name = "main_inpainting.py"
+    else:
+        print(f"Error: Unknown script type '{script_type}'. Must be 'vanilla' or 'main'")
+        sys.exit(1)
     
-    if not main_script.exists():
-        print(f"Error: {main_script} not found")
+    script = Path(__file__).parent / script_name
+    
+    if not script.exists():
+        print(f"Error: {script} not found")
         sys.exit(1)
     
     for image_num in image_nums:
@@ -27,8 +36,8 @@ def run_inpainting_batch(image_nums=range(1, 8)):
         try:
             # Run the script with image_num as argument
             result = subprocess.run(
-                [sys.executable, str(main_script), "--image_num", str(image_num)],
-                cwd=main_script.parent,
+                [sys.executable, str(script), "--image_num", str(image_num)],
+                cwd=script.parent,
                 check=True
             )
             print(f"✓ Image {image_num} completed successfully\n")
@@ -41,4 +50,5 @@ def run_inpainting_batch(image_nums=range(1, 8)):
     print(f"{'='*60}")
 
 if __name__ == "__main__":
-    run_inpainting_batch()
+    script_type = sys.argv[1] if len(sys.argv) > 1 else "main"
+    run_inpainting_batch(script_type=script_type)
