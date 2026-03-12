@@ -95,8 +95,13 @@ class vanillaPipeline():
         return image
     
 if __name__ == "__main__":
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(description="Run inpainting with specified image number")
+    parser.add_argument("--image_num", type=int, default=1, help="Image number to process (default: 1)")
+    args = parser.parse_args()
+    image_num = args.image_num
+
     vanilla_pipeline = vanillaPipeline()
-    image_num = 6
     image, mask, output_path = utils.get_image_and_mask(image_num=image_num, is_vanilla=True)
     prompt = utils.get_prompt(image_num=image_num)
     output_image = vanilla_pipeline.run_vanilla(image, mask, prompt)

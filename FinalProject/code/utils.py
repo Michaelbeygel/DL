@@ -14,7 +14,6 @@ from scipy.ndimage import binary_dilation, label
 import requests
 import string
 
-
 def create_pipeline_components(model_id, device, dtype):
     """
     Create a pipeline from a hugging face model path.
