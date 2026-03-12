@@ -23,7 +23,7 @@ class VanillaPipeline():
     def run_vanilla(self, image, mask, prompt):
         # Transform image to torch tensor and then to latent space
         img_tensor = utils.image_to_tensor(image=image, tensor_size=self.vae_sample_size, device=self.device, dtype=self.dtype) # Image to tensor
-        with torch.no_grad():  # Transform image_tensor to latent space representation
+        with torch.no_grad():
             latent_original_image = self.vae.encode(img_tensor).latent_dist.sample() * self.vae.config.scaling_factor
 
         # Transform mask to latent space size binary torch tensor based on the masked region.
@@ -49,6 +49,7 @@ class VanillaPipeline():
 
         self.scheduler.set_timesteps(25)
         guidance_scale = 7 # Control the CFG. Higher values -> higher dependency on the prompt. Values should be around 6-12.
+        noise = torch.randn_like(latents)
 
         # Applying the diffusion iterations.
         for t in self.scheduler.timesteps:
@@ -68,15 +69,11 @@ class VanillaPipeline():
 
             # Apply Classifier Free Guidance
             noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
-
             latents = self.scheduler.step(
                 noise_pred, t, latents
             ).prev_sample
 
-            # ---- INPAINTING PART ----
-            # Forward-noise the original latent to the current timestep
-            # "Mimics" the noise at timestep t and apply it to the original image(in the tesnor latent repressentation)
-            noise = torch.randn_like(latents)
+            # Noise original image
             latents_original_image_noised = self.scheduler.add_noise(
                 latent_original_image,
                 noise,

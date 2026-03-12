@@ -29,12 +29,13 @@ class MainPipeline():
         # Embedd an empty prompt for the Classifier Free Guidance
         uncond_embeddings = utils.get_text_embeddings("", self.tokenizer, self.text_encoder, self.device)
 
-        # Create a list of size 'num_of_inpaintings' of images. 
         images = []
         num_of_inpaintings = 5
-
-        # Set up a mask scheduler. This will help us change masks throughout the iterations of the pipeline.
         timestemps = 25
+        self.scheduler.set_timesteps(timestemps)
+        guidance_scale = 7 # Control the CFG. Higher values -> higher dependency on the prompt. Values should be around 6-12.
+
+        # Set up a mask scheduler. This will organize masks and variables change thourghout the diffusion process.
         mask_scheduler = utils.MaskScheduler(
             timestemps=timestemps, 
             mask=mask, 
@@ -43,13 +44,9 @@ class MainPipeline():
             dtype=self.dtype
         )
 
-        self.scheduler.set_timesteps(timestemps)
-        guidance_scale = 7 # Control the CFG. Higher values -> higher dependency on the prompt. Values should be around 6-12.
-
-        # Transform image:
-        # Image -> torch tensor with filled mask areas -> latent space
+        # Transform image to latent space with filled mask area.
         img_tensor = utils.fill_mask_area(image=image, mask=mask, tensor_size=self.vae_sample_size, blur_radius=0, device=self.device, dtype=self.dtype) # Image to tensor
-        with torch.no_grad():  # Transform image_tensor to latent space representation
+        with torch.no_grad():  # Transform img_tensor to latent space representation
             latent_original_image = self.vae.encode(img_tensor).latent_dist.sample() * self.vae.config.scaling_factor
         
         for inpaint_iteration in range(num_of_inpaintings):
@@ -64,15 +61,12 @@ class MainPipeline():
                 ),
                 device=self.device,
                 dtype=self.dtype,
-            ) * self.scheduler.init_noise_sigma # Scale the noisy latent by the scheduler scalar, as it was trained on
+            ) * self.scheduler.init_noise_sigma # Scale the noisy latent by the scheduler scalar
 
-            # Sample noise to add to the original image latent
             noise = torch.randn_like(latents)
 
             # Applying the diffusion iterations.
             for i, t in enumerate(self.scheduler.timesteps):
-                # 'prev_latent' will be the previous latent of the loop. It will not be touched thourghtout the loop.
-                # 'latents' will be the current latent representation, which will be changed and pass to the next iteration.
                 prev_latent = latents # Note: scale_model_input actually do nothing with current schedule, but safer. 
 
                 with torch.no_grad():
@@ -89,23 +83,21 @@ class MainPipeline():
 
                 # Apply Classifier Free Guidance
                 noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
-
-                latents = self.scheduler.step( # Denoise with Classifier Free Guidance noise
+                latents = self.scheduler.step(
                     noise_pred, t, prev_latent
                 ).prev_sample
 
-                # Forward-noise the original latent to the current timestep t
+                # Noise original image
                 latents_original_image_noised = self.scheduler.add_noise(
                     latent_original_image,
                     noise,
                     t
                 )
-                
-                # Get loop variables value from the 'mask_scheduler'.
+
+                # Get loop variables values from the 'mask_scheduler'.
                 mask_latent, mask_edge_latent = mask_scheduler.get_masks(inpaint_iteration, i)
                 optimization_scale = mask_scheduler.get_optimization_scale(inpaint_iteration, i)
                 gamma = mask_scheduler.get_gamma(inpaint_iteration, i)
-
                 # Apply latent space optimization with the loss function
                 latents = latents.detach().requires_grad_(True)
                 loss = self.loss_fn(
