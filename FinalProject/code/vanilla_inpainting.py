@@ -5,7 +5,14 @@ from diffusers.utils import load_image
 from PIL import Image
 import numpy as np
 from torchvision import transforms
+import argparse
 import utils
+
+# Parse command-line arguments
+parser = argparse.ArgumentParser(description="Run inpainting with specified image number")
+parser.add_argument("--image_num", type=int, default=1, help="Image number to process (default: 1)")
+args = parser.parse_args()
+image_num = args.image_num
 
 # Set up device, dtype and model 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -13,8 +20,9 @@ dtype = torch.float16
 model_id = "sd2-community/stable-diffusion-2-base"
 
 # Set up data pathes
-image_num = 1
 image_path, mask_path, saving_output_path = utils.get_paths(image_num=image_num, is_vanilla=True)
+
+# Get prompt number 'image_num' from "prompts.txt" file.  
 prompt = utils.get_prompt(image_num)
 
 # Set up pipeline components
@@ -34,8 +42,8 @@ latents = torch.randn(
     (
         batch_size,
         unet.config.in_channels,
-        latent_sample_size,
-        latent_sample_size,
+        latent_sample_size, # Height = latent sample size
+        latent_sample_size, # Widrh = latent sample size
     ),
     device=device,
     dtype=dtype,
@@ -51,8 +59,9 @@ with torch.no_grad():  # Transform image_tensor to latent space representation
 mask_latent_tensor = utils.mask_to_tensor(mask_path=mask_path, tensor_size=latent_sample_size, blur_radius=0, mask_shrink=0, device=device, dtype=dtype)
 
 scheduler.set_timesteps(25)
-guidance_scale = 7
+guidance_scale = 7 # Control the CFG. Higher values -> higher dependency on the prompt. Values should be around 6-12.
 
+# Applying the diffusion iterations.
 for t in scheduler.timesteps:
     latent_model_input = scheduler.scale_model_input(latents, t) # Note: scale_model_input actually do nothing with current schedule, but safer. 
 
@@ -68,14 +77,16 @@ for t in scheduler.timesteps:
             encoder_hidden_states=uncond_embeddings
         ).sample
 
-    # Apply CFG
+    # Apply Classifier Free Guidance
     noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
 
     latents = scheduler.step(
         noise_pred, t, latents
     ).prev_sample
 
-    # Noise the original image
+    # ---- INPAINTING PART ----
+    # Forward-noise the original latent to the current timestep
+    # "Mimics" the noise at timestep t and apply it to the original image(in the tesnor latent repressentation)
     noise = torch.randn_like(latents)
     latents_original_image_noised = scheduler.add_noise(
         latent_original_image,
@@ -83,7 +94,7 @@ for t in scheduler.timesteps:
         t
     )
     
-    # Clamp known regions
+    # Clamp known region. Note: '*' is elemnent-wise multiplication.
     latents = mask_latent_tensor * latents_original_image_noised + (1 - mask_latent_tensor) * latents
 
 latents = latents / vae.config.scaling_factor
