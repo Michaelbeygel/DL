@@ -15,8 +15,6 @@ model_id = "sd2-community/stable-diffusion-2-base"
 # Set up data pathes
 image_num = 1
 image_path, mask_path, saving_output_path = utils.get_paths(image_num=image_num, is_vanilla=True)
-
-# Get prompt number 'image_num' from "prompts.txt" file.  
 prompt = utils.get_prompt(image_num)
 
 # Set up pipeline components
@@ -36,8 +34,8 @@ latents = torch.randn(
     (
         batch_size,
         unet.config.in_channels,
-        latent_sample_size, # Height = latent sample size
-        latent_sample_size, # Widrh = latent sample size
+        latent_sample_size,
+        latent_sample_size,
     ),
     device=device,
     dtype=dtype,
@@ -53,9 +51,8 @@ with torch.no_grad():  # Transform image_tensor to latent space representation
 mask_latent_tensor = utils.mask_to_tensor(mask_path=mask_path, tensor_size=latent_sample_size, blur_radius=0, mask_shrink=0, device=device, dtype=dtype)
 
 scheduler.set_timesteps(25)
-guidance_scale = 7 # Control the CFG. Higher values -> higher dependency on the prompt. Values should be around 6-12.
+guidance_scale = 7
 
-# Applying the diffusion iterations.
 for t in scheduler.timesteps:
     latent_model_input = scheduler.scale_model_input(latents, t) # Note: scale_model_input actually do nothing with current schedule, but safer. 
 
@@ -71,16 +68,14 @@ for t in scheduler.timesteps:
             encoder_hidden_states=uncond_embeddings
         ).sample
 
-    # Apply Classifier Free Guidance
+    # Apply CFG
     noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
 
     latents = scheduler.step(
         noise_pred, t, latents
     ).prev_sample
 
-    # ---- INPAINTING PART ----
-    # Forward-noise the original latent to the current timestep
-    # "Mimics" the noise at timestep t and apply it to the original image(in the tesnor latent repressentation)
+    # Noise the original image
     noise = torch.randn_like(latents)
     latents_original_image_noised = scheduler.add_noise(
         latent_original_image,
@@ -88,7 +83,7 @@ for t in scheduler.timesteps:
         t
     )
     
-    # Clamp known region. Note: '*' is elemnent-wise multiplication.
+    # Clamp known regions
     latents = mask_latent_tensor * latents_original_image_noised + (1 - mask_latent_tensor) * latents
 
 latents = latents / vae.config.scaling_factor
