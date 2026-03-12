@@ -13,6 +13,7 @@ import cv2
 from scipy.ndimage import binary_dilation, label
 import requests
 import string
+from torchvision.transforms import ToPILImage
 
 def create_pipeline_components(model_id, device, dtype):
     """
@@ -366,7 +367,6 @@ class InpaintingEvaluator:
         
         # 2. Semantic alignment
         # Convert tensor to PIL for your existing CLIPScore.CLIP_score method
-        from torchvision.transforms import ToPILImage
         gen_pil = ToPILImage()(gen_01.squeeze(0).cpu())
         clip_val = self.clip_scorer.CLIP_score(gen_pil, prompt)
         

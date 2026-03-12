@@ -59,8 +59,8 @@ class MainPipeline():
                 (
                     batch_size,
                     self.unet.config.in_channels,
-                    self.latent_sample_size, # Height = latent sample size
-                    self.latent_sample_size, # Widrh = latent sample size
+                    self.latent_sample_size,
+                    self.latent_sample_size,
                 ),
                 device=self.device,
                 dtype=self.dtype,
@@ -124,7 +124,7 @@ class MainPipeline():
             # Append 'decode(latents)' to images list.
             latents = latents / self.vae.config.scaling_factor
             with torch.no_grad():
-                image = self.vae.decode(latents ).sample
+                image = self.vae.decode(latents).sample
             image = utils.tensor_to_image(image_tensor=image)
             images.append(image)
         # Choose image with maximal CLIP score
