@@ -6,8 +6,8 @@ from datasets import load_dataset
 from tqdm import tqdm
 from PIL import ImageChops
 import utils
-from main_inpainting import run_main
-from vanilla_inpainting import run_vanilla
+from main_inpainting import MainPipeline
+from vanilla_inpainting import VanillaPipeline
 
 def run_benchmark(num_samples=5):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -20,6 +20,9 @@ def run_benchmark(num_samples=5):
     dataset = load_dataset("paint-by-inpaint/PIPE", split="test", streaming=True)
     results = []
 
+    main_pipeline = MainPipeline()
+    vanilla_pipeline = VanillaPipeline()
+
     for i, sample in enumerate(tqdm(dataset, total=num_samples, desc="Benchmark")):
         if i >= num_samples: break
         
@@ -28,8 +31,8 @@ def run_benchmark(num_samples=5):
         prompt = sample["Instruction_VLM-LLM"]
         
         # 1. Run Approaches
-        m_tensor = run_main(source, mask, prompt)
-        v_tensor = run_vanilla(source, mask, prompt)
+        m_tensor = main_pipeline.run_main(source, mask, prompt)
+        v_tensor = vanilla_pipeline.run_vanilla(source, mask, prompt)
         tar_tensor = utils.image_to_tensor_from_pil(target, 512, device, dtype)
 
         # 2. Evaluation

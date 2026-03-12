@@ -8,7 +8,7 @@ from torchvision import transforms
 import argparse
 import utils
 
-class vanillaPipeline():
+class VanillaPipeline():
     def __init__(self):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.dtype = torch.float16
@@ -101,7 +101,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     image_num = args.image_num
 
-    vanilla_pipeline = vanillaPipeline()
+    vanilla_pipeline = VanillaPipeline()
     image, mask, output_path = utils.get_image_and_mask(image_num=image_num, is_vanilla=True)
     prompt = utils.get_prompt(image_num=image_num)
     output_image = vanilla_pipeline.run_vanilla(image, mask, prompt)
