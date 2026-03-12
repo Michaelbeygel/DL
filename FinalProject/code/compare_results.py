@@ -1,51 +1,54 @@
-import torch
+import sys, gc, torch
+from unittest.mock import MagicMock
+sys.modules["diffusers.models.attention_dispatch"] = MagicMock()
 import pandas as pd
 from datasets import load_dataset
 from tqdm import tqdm
+from PIL import ImageChops
 import utils
-from main_inpainting import run_main # change to the the real functiuon name
-from vanilla_inpainting import run_vanilla # change to the the real functiuon name
+from main_inpainting import run_main
+from vanilla_inpainting import run_vanilla
 
-def run_benchmark(num_samples=10):
+def generate_mask(source, target):
+    diff = ImageChops.difference(source.convert("RGB"), target.convert("RGB"))
+    return diff.convert("L").point(lambda x: 255 if x > 15 else 0)
+
+def run_benchmark(num_samples=5):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     evaluator = utils.InpaintingEvaluator(device)
-    
-    # Load PIPE dataset (No git clone needed!)
-    dataset = load_dataset("paint-by-inpaint/PIPE", split="test")
+    dataset = load_dataset("paint-by-inpaint/PIPE", split="test", streaming=True)
     results = []
 
-    for i in tqdm(range(num_samples), desc="Comparing Main vs Vanilla"):
-        sample = dataset[i]
+    for i, sample in enumerate(tqdm(dataset, total=num_samples, desc="Benchmark")):
+        if i >= num_samples: break
         
-        # Extract inputs for your functions
+        source, target = sample["source_img"], sample["target_img"]
+        mask = generate_mask(source, target)
         prompt = sample["Instruction_VLM-LLM"]
-        source_img = sample["source_img"] # Image with object removed
-        mask_img = sample["mask"]         # The binary mask
-        target_img = sample["target_img"] # The "Answer Key" (Ground Truth)
-
-        # Run your logic (Ensure they return: tensor, pil_image)
-        # tensor: (1, 3, 512, 512) normalized [-1, 1]
-        v_tensor = run_vanilla(source_img, mask_img, prompt)
-        m_tensor = run_main(source_img, mask_img, prompt)
         
-        # Prepare Ground Truth for comparison
-        target_tensor = utils.image_to_tensor(target_img, 512, device, torch.float16)
+        m_tensor = run_main(source, mask, prompt)
+        v_tensor = run_vanilla(source, mask, prompt)
+        tar_tensor = utils.image_to_tensor_from_pil(target, 512, device, torch.float16)
 
-        # Calculate Metrics
-        m_v = evaluator.evaluate(v_tensor, target_tensor)
-        m_m = evaluator.evaluate(m_tensor, target_tensor)
+        # Evaluation including CLIP Score
+        res_v = evaluator.evaluate(v_tensor, tar_tensor, prompt)
+        res_m = evaluator.evaluate(m_tensor, tar_tensor, prompt)
 
         results.append({
-            "Sample": i,
-            "Vanilla_PSNR": m_v["PSNR"], "Main_PSNR": m_m["PSNR"],
-            "Vanilla_LPIPS": m_v["LPIPS"], "Main_LPIPS": m_m["LPIPS"]
+            "Sample": i, 
+            "Vanilla_PSNR": res_v["PSNR"], "Main_PSNR": res_m["PSNR"], 
+            "Vanilla_CLIP": res_v["CLIP"], "Main_CLIP": res_m["CLIP"]
         })
+        torch.cuda.empty_cache(); gc.collect()
 
-    # Output a summary table
     df = pd.DataFrame(results)
-    print("\n--- Mean Performance ---")
-    print(df.mean(numeric_only=True))
-    df.to_csv("benchmark_results.csv", index=False)
+    if not df.empty:
+        print("\n--- Mean Results ---")
+        print(df.mean(numeric_only=True))
+        df.to_csv("benchmark_results.csv", index=False)
+        print("Results saved to benchmark_results.csv")
+    else:
+        print("No samples were processed.")
 
 if __name__ == "__main__":
-    run_benchmark(10)
+    run_benchmark(1)
