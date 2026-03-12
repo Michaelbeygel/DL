@@ -58,7 +58,7 @@ def create_pipeline_components(model_id, device, dtype):
 
     return components_dict
 
-def get_image_and_mask(image_num=1, is_vanilla=True):
+def get_image_and_mask(image_num, is_vanilla):
     """
     Returns the paths for the image, mask and output.
     """
@@ -74,7 +74,7 @@ def get_image_and_mask(image_num=1, is_vanilla=True):
 
     return image, mask, output_path
 
-def get_prompt(image_num=1):
+def get_prompt(image_num):
     """
     Returns prompt number 'image_num' from "promprt.txt" file.
     """
@@ -129,9 +129,9 @@ def mask_to_tensor(mask, tensor_size, blur_radius, mask_shrink, device, dtype):
     )
     return mask_tensor
 
-def get_edge_mask(mask_path, tensor_size, edge_boundry_size, device, dtype):
+def get_edge_mask(mask, tensor_size, edge_boundry_size, device, dtype):
     # Create a tensor with 0-1 such that white->0, black->1
-    mask = Image.open(mask_path).convert("L")  # "L" = single channel
+    mask = mask.convert("L")  # "L" = single channel
     mask = mask.resize((tensor_size, tensor_size))
 
     mask_tensor = transforms.ToTensor()(mask)            # [1,H,W], values in [0,1]
@@ -230,21 +230,16 @@ class LatentLoss(nn.Module):
         loss = non_mask_loss + gamma * total_variation_loss
         return loss
 
-def image_fill_mask_boundary_average(image_path, mask_path, tensor_size, blur_radius, device, dtype):
+def fill_mask_area(image, mask, tensor_size, blur_radius, device, dtype):
     """
     Load image and mask, resize them, compute the average color of pixels surrounding the mask edge, and fill with it the masked region.
-
-    :param image_path: Local path to image.
-    :param mask_path: Local path to mask.
-    :param tensor_size: Desired image size.
-    :return: PIL.Image
     """
     # Load image
-    img = Image.open(image_path).convert("RGB")
+    img = image.convert("RGB")
     img = img.resize((tensor_size, tensor_size))
 
     # Load mask
-    mask = Image.open(mask_path).convert("L")
+    mask = mask.convert("L")
     mask = mask.resize((tensor_size, tensor_size))
     # Blur the mask
     mask = mask.filter(ImageFilter.GaussianBlur(radius=blur_radius))
@@ -311,20 +306,20 @@ class CLIPScore(nn.Module):
         return logits_per_image.sum().item()
 
 class MaskScheduler():
-    def __init__(self, timestemps, mask_path, tensor_size, device, dtype):
+    def __init__(self, timestemps, mask, tensor_size, device, dtype):
         self.timestemps = timestemps
         self.device = device
         self.dtype = dtype
         self.start_phase_treshold = 12
-        self.regular_mask = mask_to_tensor(mask_path=mask_path, tensor_size=tensor_size, blur_radius=0, mask_shrink=0, device=device, dtype=dtype)
-        self.edge_mask = get_edge_mask(mask_path=mask_path, tensor_size=tensor_size, edge_boundry_size=1, device=device, dtype=dtype)
+        self.regular_mask = mask_to_tensor(mask=mask, tensor_size=tensor_size, blur_radius=0, mask_shrink=0, device=device, dtype=dtype)
+        self.edge_mask = get_edge_mask(mask=mask, tensor_size=tensor_size, edge_boundry_size=1, device=device, dtype=dtype)
         # Fill the masks_list variable with multiple masks
         masks_variables = [ # The first element corresponds to 'blur_radius' and the second to 'mask_shrink'
             [0,3], [0,2], [0,2], [0,1], [0,1]
         ]
         self.masks_list = []
         for blur_radius, mask_shrink in masks_variables:
-            self.masks_list.append(mask_to_tensor(mask_path=mask_path, tensor_size=tensor_size, blur_radius=blur_radius, mask_shrink=mask_shrink, device=device, dtype=dtype))
+            self.masks_list.append(mask_to_tensor(mask=mask, tensor_size=tensor_size, blur_radius=blur_radius, mask_shrink=mask_shrink, device=device, dtype=dtype))
         
     def get_masks(self, inpaint_iteration, i):
         if i > self.start_phase_treshold:

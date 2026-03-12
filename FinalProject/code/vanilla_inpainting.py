@@ -17,16 +17,17 @@ class vanillaPipeline():
         self.pipe = utils.create_pipeline_components(self.model_id, self.device, self.dtype)
         self.tokenizer, self.text_encoder = self.pipe["tokenizer"], self.pipe["text_encoder"]
         self.unet, self.vae, self.scheduler = self.pipe["unet"], self.pipe["vae"], self.pipe["scheduler"]
+        self.latent_sample_size = self.unet.config.sample_size
+        self.vae_sample_size = self.vae.config.sample_size
 
     def run_vanilla(self, image, mask, prompt):
         # Transform image to torch tensor and then to latent space
-        vae_sample_size = self.vae.config.sample_size #  size of feature space
-        img_tensor = utils.image_to_tensor(image=image, tensor_size=vae_sample_size, device=self.device, dtype=self.dtype) # Image to tensor
+        img_tensor = utils.image_to_tensor(image=image, tensor_size=self.vae_sample_size, device=self.device, dtype=self.dtype) # Image to tensor
         with torch.no_grad():  # Transform image_tensor to latent space representation
             latent_original_image = self.vae.encode(img_tensor).latent_dist.sample() * self.vae.config.scaling_factor
 
         # Transform mask to latent space size binary torch tensor based on the masked region.
-        mask_latent_tensor = utils.mask_to_tensor(mask=mask, tensor_size=latent_sample_size, blur_radius=0, mask_shrink=0, device=self.device, dtype=self.dtype)
+        mask_latent_tensor = utils.mask_to_tensor(mask=mask, tensor_size=self.latent_sample_size, blur_radius=0, mask_shrink=0, device=self.device, dtype=self.dtype)
 
         # Embedd the prompt. workflow: prompt -> tokens -> embedding
         text_embeddings = utils.get_text_embeddings(prompt, self.tokenizer,self.text_encoder, self.device)
@@ -35,13 +36,12 @@ class vanillaPipeline():
 
         # Sample random latent space data
         batch_size = 1
-        latent_sample_size = self.unet.config.sample_size
         latents = torch.randn(
             (
                 batch_size,
                 self.unet.config.in_channels,
-                latent_sample_size, # Height = latent sample size
-                latent_sample_size, # Widrh = latent sample size
+                self.latent_sample_size, # Height = latent sample size
+                self.latent_sample_size, # Widrh = latent sample size
             ),
             device=self.device,
             dtype=self.dtype,
@@ -96,7 +96,7 @@ class vanillaPipeline():
     
 if __name__ == "__main__":
     vanilla_pipeline = vanillaPipeline()
-    image_num = 1
+    image_num = 6
     image, mask, output_path = utils.get_image_and_mask(image_num=image_num, is_vanilla=True)
     prompt = utils.get_prompt(image_num=image_num)
     output_image = vanilla_pipeline.run_vanilla(image, mask, prompt)
