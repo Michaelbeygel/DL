@@ -1,5 +1,6 @@
 # This file containes helping functions for the project!
-
+from torchmetrics.image import StructuralSimilarityIndexMeasure, PeakSignalNoiseRatio
+from torchmetrics.image.fid import FrechetInceptionDistance
 from PIL import Image, ImageFilter, ImageOps
 from torchvision import transforms
 from transformers import CLIPTokenizer, CLIPTextModel, CLIPProcessor, CLIPModel
@@ -339,25 +340,53 @@ class MaskScheduler():
         if i < self.start_phase_treshold:
             return 0.01
         return 0.005
-        
-class InpaintingEvaluator:
-    def __init__(self, device):
-        # LPIPS for perceptual similarity (standard 'alex' net)
-        self.lpips_metric = LearnedPerceptualImagePatchSimilarity(net_type='alex').to(device)
-        # PSNR for pixel-level reconstruction fidelity
-        self.psnr_metric = PeakSignalNoiseRatio(data_range=1.0).to(device)
 
-    def evaluate(self, generated_tensor, target_tensor):
-        """
-        :param generated_tensor: VAE output (B, C, H, W) in [-1, 1]
-        :param target_tensor: Ground truth (B, C, H, W) in [-1, 1]
-        """
-        # LPIPS works on [-1, 1]
-        lpips_score = self.lpips_metric(generated_tensor, target_tensor)
+
+class InpaintingEvaluator:
+    def __init__(self, device, dtype=torch.float16):
+        self.device = device
+        self.dtype = dtype
         
-        # PSNR works on [0, 1]
-        gen_01 = (generated_tensor / 2.0 + 0.5).clamp(0, 1)
-        tar_01 = (target_tensor / 2.0 + 0.5).clamp(0, 1)
-        psnr_score = self.psnr_metric(gen_01, tar_01)
+        # Standard fidelity metrics
+        self.psnr_metric = PeakSignalNoiseRatio(data_range=1.0).to(device)
+        self.ssim_metric = StructuralSimilarityIndexMeasure(data_range=1.0).to(device)
         
-        return {"LPIPS": lpips_score.item(), "PSNR": psnr_score.item()}
+        # FID accumulates stats globally across the dataset
+        self.fid_metric = FrechetInceptionDistance(feature=2048).to(device)
+        
+        # Semantic alignment metric
+        self.clip_scorer = CLIPScore(device, dtype) # Uses your existing CLIPScore class
+
+    def evaluate_step(self, gen_tensor, tar_tensor, prompt, is_main=True):
+        """
+        Per-sample evaluation.
+        gen_tensor/tar_tensor: VAE output range [-1, 1]
+        """
+        # Convert to [0, 1] for SSIM and PSNR
+        gen_01 = (gen_tensor / 2.0 + 0.5).clamp(0, 1)
+        tar_01 = (tar_tensor / 2.0 + 0.5).clamp(0, 1)
+        
+        # 1. Structural/Pixel metrics
+        ssim_val = self.ssim_metric(gen_01, tar_01).item()
+        psnr_val = self.psnr_metric(gen_01, tar_01).item()
+        
+        # 2. Semantic alignment
+        # Convert tensor to PIL for your existing CLIPScore.CLIP_score method
+        from torchvision.transforms import ToPILImage
+        gen_pil = ToPILImage()(gen_01.squeeze(0).cpu())
+        clip_val = self.clip_scorer.CLIP_score(gen_pil, prompt)
+        
+        # 3. Update FID State (Expects uint8 [0, 255])
+        gen_u8 = (gen_01 * 255).to(torch.uint8)
+        tar_u8 = (tar_01 * 255).to(torch.uint8)
+        
+        # Only update 'real' distribution once per sample pair
+        if is_main:
+            self.fid_metric.update(tar_u8, real=True)
+        self.fid_metric.update(gen_u8, real=False)
+        
+        return {"PSNR": psnr_val, "SSIM": ssim_val, "CLIP": clip_val}
+
+    def compute_final_fid(self):
+        """Returns the global dataset FID score"""
+        return self.fid_metric.compute().item()
