@@ -57,11 +57,9 @@ def create_pipeline_components(model_id, device, dtype):
 
     return components_dict
 
-def get_paths(image_num, is_vanilla):
+def get_image_and_mask(image_num=1, is_vanilla=True):
     """
     Returns the paths for the image, mask and output.
-
-    :param image_num: Number of image to get the paths of.
     """
     image_path = f"../data/images/image{image_num:02d}.jpg"
     mask_path = f"../data/masks/mask{image_num:02d}.jpg"
@@ -70,30 +68,25 @@ def get_paths(image_num, is_vanilla):
     else:
         output_path = f"../data/outputs/main_outputs/inpaint{image_num:02d}.jpg"
 
-    return image_path, mask_path, output_path
+    image = Image.open(image_path)
+    mask = Image.open(mask_path)
 
-def get_prompt(image_num):
+    return image, mask, output_path
+
+def get_prompt(image_num=1):
     """
     Returns prompt number 'image_num' from "promprt.txt" file.
-
-    :param image_num: Desired prompt number.
     """
     prompt_path = "../data/prompts.txt"
     with open(prompt_path, "r") as f:
         prompt = f.read().splitlines()[image_num - 1]
     return prompt
 
-def image_to_tensor(image_path, tensor_size, device, dtype):
+def image_to_tensor(image, tensor_size, device, dtype):
     """
     Transfrom an image to a tensor.
-    
-    :param image_path: Local path to image.
-    :param tensor_size: Desired size of output tensor.
-    :param is_mask: True if the image is a mask.
-    :param device: The device to move the tensor to ('cuda' or 'cpu').
-    :param dtype: The torch dtype to cast the tensor to.
     """
-    img = Image.open(image_path).convert("RGB")
+    img = image.convert("RGB")
     transform = transforms.Compose([
         transforms.Resize((tensor_size, tensor_size)),
         transforms.ToTensor(),              # [0, 1], shape [Channels, Height, Width]
@@ -106,35 +99,28 @@ def image_to_tensor(image_path, tensor_size, device, dtype):
     )
     return img_tensor
 
-def mask_to_tensor(mask_path, tensor_size, blur_radius, mask_shrink, device, dtype):
+def mask_to_tensor(mask, tensor_size, blur_radius, mask_shrink, device, dtype):
     """
     Transfrom a mask to a tensor.
-    Choose how to transform the mask.
-    
-    :param mask_path: Local path to mask.
-    :param tensor_size: Desired size of output tensor.
-    :param blur_radius: The radius of the blur.
-    :param device: The device to move the tensor to ('cuda' or 'cpu').
-    :param dtype: The torch dtype to cast the tensor to.
+    Choose how to transform the mask with 'blur_radius' and 'mask_shrink'.
     """
     # Create a tensor with 0-1 such that white->0, black->1
-    mask = Image.open(mask_path).convert("L")  # "L" = single channel
+    mask = mask.convert("L")  # "L" = single channel
     mask = mask.resize((tensor_size, tensor_size))
 
     # Apply Gaussian blur if blur_radius > 0
     if blur_radius > 0:
         mask = mask.filter(ImageFilter.GaussianBlur(radius=blur_radius))
 
-        # Shrink or expand mask
+    # Shrink or expand mask
     if mask_shrink != 0:
-        # Use MinFilter to shrink (erode) or MaxFilter to expand (dilate)
-        filter_size = max(1, abs(mask_shrink)*2+1)  # filter size must be odd and >= 1
+        filter_size = max(1, abs(mask_shrink)*2+1)
         if mask_shrink > 0:
-            mask = mask.filter(ImageFilter.MinFilter(filter_size))  # shrink white
+            mask = mask.filter(ImageFilter.MinFilter(filter_size))  # shrink white area
         else:
-            mask = mask.filter(ImageFilter.MaxFilter(filter_size))  # expand white
+            mask = mask.filter(ImageFilter.MaxFilter(filter_size))  # expand white area
 
-    mask_tensor = transforms.ToTensor()(mask)            # [1,H,W], values in [0,1]
+    mask_tensor = transforms.ToTensor()(mask)
     mask_tensor = 1.0 - mask_tensor
     mask_tensor = mask_tensor.to( # Move mask_tensor to GPU, and transform to dtype
         device=device,

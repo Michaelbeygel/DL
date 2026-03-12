@@ -8,99 +8,96 @@ from torchvision import transforms
 import argparse
 import utils
 
-# Parse command-line arguments
-parser = argparse.ArgumentParser(description="Run inpainting with specified image number")
-parser.add_argument("--image_num", type=int, default=1, help="Image number to process (default: 1)")
-args = parser.parse_args()
-image_num = args.image_num
+class vanillaPipeline():
+    def __init__(self):
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.dtype = torch.float16
+        self.model_id = "sd2-community/stable-diffusion-2-base"
+        # Set up pipeline components
+        self.pipe = utils.create_pipeline_components(self.model_id, self.device, self.dtype)
+        self.tokenizer, self.text_encoder = self.pipe["tokenizer"], self.pipe["text_encoder"]
+        self.unet, self.vae, self.scheduler = self.pipe["unet"], self.pipe["vae"], self.pipe["scheduler"]
 
-# Set up device, dtype and model 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-dtype = torch.float16
-model_id = "sd2-community/stable-diffusion-2-base"
+    def run_vanilla(self, image, mask, prompt):
+        # Transform image to torch tensor and then to latent space
+        vae_sample_size = self.vae.config.sample_size #  size of feature space
+        img_tensor = utils.image_to_tensor(image=image, tensor_size=vae_sample_size, device=self.device, dtype=self.dtype) # Image to tensor
+        with torch.no_grad():  # Transform image_tensor to latent space representation
+            latent_original_image = self.vae.encode(img_tensor).latent_dist.sample() * self.vae.config.scaling_factor
 
-# Set up data pathes
-image_path, mask_path, saving_output_path = utils.get_paths(image_num=image_num, is_vanilla=True)
+        # Transform mask to latent space size binary torch tensor based on the masked region.
+        mask_latent_tensor = utils.mask_to_tensor(mask=mask, tensor_size=latent_sample_size, blur_radius=0, mask_shrink=0, device=self.device, dtype=self.dtype)
 
-# Get prompt number 'image_num' from "prompts.txt" file.  
-prompt = utils.get_prompt(image_num)
+        # Embedd the prompt. workflow: prompt -> tokens -> embedding
+        text_embeddings = utils.get_text_embeddings(prompt, self.tokenizer,self.text_encoder, self.device)
+        # Embedd an empty prompt for the Classifier Free Guidance
+        uncond_embeddings = utils.get_text_embeddings("", self.tokenizer,self.text_encoder, self.device)
 
-# Set up pipeline components
-pipe = utils.create_pipeline_components(model_id, device, dtype)
-tokenizer, text_encoder = pipe["tokenizer"], pipe["text_encoder"]
-unet, vae, scheduler = pipe["unet"], pipe["vae"], pipe["scheduler"]
+        # Sample random latent space data
+        batch_size = 1
+        latent_sample_size = self.unet.config.sample_size
+        latents = torch.randn(
+            (
+                batch_size,
+                self.unet.config.in_channels,
+                latent_sample_size, # Height = latent sample size
+                latent_sample_size, # Widrh = latent sample size
+            ),
+            device=self.device,
+            dtype=self.dtype,
+        ) * self.scheduler.init_noise_sigma # Scale the noisy latent by the scheduler scalar, as it was trained on
 
-# Embedd the prompt. workflow: prompt -> tokens -> embedding
-text_embeddings = utils.get_text_embeddings(prompt, tokenizer,text_encoder, device)
-# Embedd an empty prompt for the Classifier Free Guidance
-uncond_embeddings = utils.get_text_embeddings("", tokenizer,text_encoder, device)
+        self.scheduler.set_timesteps(25)
+        guidance_scale = 7 # Control the CFG. Higher values -> higher dependency on the prompt. Values should be around 6-12.
 
-# Sample random latent space data
-batch_size = 1
-latent_sample_size = unet.config.sample_size
-latents = torch.randn(
-    (
-        batch_size,
-        unet.config.in_channels,
-        latent_sample_size, # Height = latent sample size
-        latent_sample_size, # Widrh = latent sample size
-    ),
-    device=device,
-    dtype=dtype,
-) * scheduler.init_noise_sigma # Scale the noisy latent by the scheduler scalar, as it was trained on
+        # Applying the diffusion iterations.
+        for t in self.scheduler.timesteps:
+            latent_model_input = self.scheduler.scale_model_input(latents, t) # Note: scale_model_input actually do nothing with current schedule, but safer. 
 
-# Transform image to torch tensor and then to latent space
-vae_sample_size = vae.config.sample_size #  size of feature space
-img_tensor = utils.image_to_tensor(image_path=image_path, tensor_size=vae_sample_size, device=device, dtype=dtype) # Image to tensor
-with torch.no_grad():  # Transform image_tensor to latent space representation
-    latent_original_image = vae.encode(img_tensor).latent_dist.sample() * vae.config.scaling_factor
+            with torch.no_grad():
+                noise_pred_text = self.unet(
+                    latent_model_input,
+                    t,
+                    encoder_hidden_states=text_embeddings
+                ).sample
+                noise_pred_uncond = self.unet(
+                    latent_model_input, 
+                    t, 
+                    encoder_hidden_states=uncond_embeddings
+                ).sample
 
-# Transform mask to latent space size binary torch tensor based on the masked region.
-mask_latent_tensor = utils.mask_to_tensor(mask_path=mask_path, tensor_size=latent_sample_size, blur_radius=0, mask_shrink=0, device=device, dtype=dtype)
+            # Apply Classifier Free Guidance
+            noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
 
-scheduler.set_timesteps(25)
-guidance_scale = 7 # Control the CFG. Higher values -> higher dependency on the prompt. Values should be around 6-12.
+            latents = self.scheduler.step(
+                noise_pred, t, latents
+            ).prev_sample
 
-# Applying the diffusion iterations.
-for t in scheduler.timesteps:
-    latent_model_input = scheduler.scale_model_input(latents, t) # Note: scale_model_input actually do nothing with current schedule, but safer. 
+            # ---- INPAINTING PART ----
+            # Forward-noise the original latent to the current timestep
+            # "Mimics" the noise at timestep t and apply it to the original image(in the tesnor latent repressentation)
+            noise = torch.randn_like(latents)
+            latents_original_image_noised = self.scheduler.add_noise(
+                latent_original_image,
+                noise,
+                t
+            )
+            
+            # Clamp known region. Note: '*' is elemnent-wise multiplication.
+            latents = mask_latent_tensor * latents_original_image_noised + (1 - mask_latent_tensor) * latents
 
-    with torch.no_grad():
-        noise_pred_text = unet(
-            latent_model_input,
-            t,
-            encoder_hidden_states=text_embeddings
-        ).sample
-        noise_pred_uncond = unet(
-            latent_model_input, 
-            t, 
-            encoder_hidden_states=uncond_embeddings
-        ).sample
+        latents = latents / self.vae.config.scaling_factor
 
-    # Apply Classifier Free Guidance
-    noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
+        with torch.no_grad():
+            image = self.vae.decode(latents).sample
 
-    latents = scheduler.step(
-        noise_pred, t, latents
-    ).prev_sample
-
-    # ---- INPAINTING PART ----
-    # Forward-noise the original latent to the current timestep
-    # "Mimics" the noise at timestep t and apply it to the original image(in the tesnor latent repressentation)
-    noise = torch.randn_like(latents)
-    latents_original_image_noised = scheduler.add_noise(
-        latent_original_image,
-        noise,
-        t
-    )
+        image = utils.tensor_to_image(image_tensor=image)
+        return image
     
-    # Clamp known region. Note: '*' is elemnent-wise multiplication.
-    latents = mask_latent_tensor * latents_original_image_noised + (1 - mask_latent_tensor) * latents
-
-latents = latents / vae.config.scaling_factor
-
-with torch.no_grad():
-    image = vae.decode(latents).sample
-
-image = utils.tensor_to_image(image_tensor=image)
-image.save(saving_output_path)
+if __name__ == "__main__":
+    vanilla_pipeline = vanillaPipeline()
+    image_num = 1
+    image, mask, output_path = utils.get_image_and_mask(image_num=image_num, is_vanilla=True)
+    prompt = utils.get_prompt(image_num=image_num)
+    output_image = vanilla_pipeline.run_vanilla(image, mask, prompt)
+    output_image.save(output_path)
