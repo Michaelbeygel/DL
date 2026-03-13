@@ -53,7 +53,7 @@ def image_to_tensor(image, tensor_size, device, dtype):
     transform = transforms.Compose([
         transforms.Resize((tensor_size, tensor_size)),
         transforms.ToTensor(),
-        transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])  # Normalize to cope with autoencoder value range
+        transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
     ])
     img_tensor = transform(img).unsqueeze(0)
     img_tensor = img_tensor.to(device, dtype)
@@ -91,7 +91,7 @@ def get_edge_mask(mask, tensor_size, edge_boundry_size, device, dtype):
     mask_tensor = 1.0 - mask_tensor
     mask_tensor = mask_tensor.to(device, dtype)
 
-    # Calculate the edges mask with max-pool convolusions. Specifically calculates the difference between an extended mask and a shrinked mask.
+    # Calculates the difference between an extended mask and a shrinked mask.
     kernel_size = edge_boundry_size * 2 + 1
     big_mask = F.max_pool2d(mask_tensor, kernel_size=kernel_size, stride=1, padding=edge_boundry_size)
     small_mask = -F.max_pool2d(-mask_tensor, kernel_size=kernel_size, stride=1, padding=edge_boundry_size)
@@ -256,35 +256,25 @@ class InpaintingEvaluator:
     def __init__(self, device, dtype=torch.float16):
         self.device = device
         self.dtype = dtype
-        
         self.psnr_metric = PeakSignalNoiseRatio(data_range=1.0).to(device)
         self.ssim_metric = StructuralSimilarityIndexMeasure(data_range=1.0).to(device)
-        
         self.fid_metric = FrechetInceptionDistance(feature=2048).to(device)
-        
-        self.clip_scorer = CLIPScore(device, dtype) # Uses your existing CLIPScore class
+        self.clip_scorer = CLIPScore(device, dtype)
 
+    # Per-sample evaluation.
+    # gen_tensor/tar_tensor: VAE output range [-1, 1]
     def evaluate_step(self, gen_tensor, tar_tensor, prompt, is_main=True):
-        """
-        Per-sample evaluation.
-        gen_tensor/tar_tensor: VAE output range [-1, 1]
-        """
         gen_01 = (gen_tensor / 2.0 + 0.5).clamp(0, 1)
         tar_01 = (tar_tensor / 2.0 + 0.5).clamp(0, 1)
-        
         ssim_val = self.ssim_metric(gen_01, tar_01).item()
         psnr_val = self.psnr_metric(gen_01, tar_01).item()
-        
         gen_pil = ToPILImage()(gen_01.squeeze(0).cpu())
         clip_val = self.clip_scorer.CLIP_score(gen_pil, prompt)
-        
         gen_u8 = (gen_01 * 255).to(torch.uint8)
         tar_u8 = (tar_01 * 255).to(torch.uint8)
-        
         if is_main:
             self.fid_metric.update(tar_u8, real=True)
         self.fid_metric.update(gen_u8, real=False)
-        
         return {"PSNR": psnr_val, "SSIM": ssim_val, "CLIP": clip_val}
 
     def compute_final_fid(self):

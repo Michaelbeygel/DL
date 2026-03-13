@@ -13,7 +13,6 @@ class VanillaPipeline():
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.dtype = torch.float16
         self.model_id = "sd2-community/stable-diffusion-2-base"
-        # Set up pipeline components
         self.pipe = utils.create_pipeline_components(self.model_id, self.device, self.dtype)
         self.tokenizer, self.text_encoder = self.pipe["tokenizer"], self.pipe["text_encoder"]
         self.unet, self.vae, self.scheduler = self.pipe["unet"], self.pipe["vae"], self.pipe["scheduler"]
@@ -21,12 +20,10 @@ class VanillaPipeline():
         self.vae_sample_size = self.vae.config.sample_size
 
     def run_vanilla(self, image, mask, prompt):
-        # Transform image to torch tensor and then to latent space
         img_tensor = utils.image_to_tensor(image=image, tensor_size=self.vae_sample_size, device=self.device, dtype=self.dtype) # Image to tensor
         with torch.no_grad():
             latent_original_image = self.vae.encode(img_tensor).latent_dist.sample() * self.vae.config.scaling_factor
 
-        # Transform mask to latent space size binary torch tensor based on the masked region.
         mask_latent_tensor = utils.mask_to_tensor(mask=mask, tensor_size=self.latent_sample_size, blur_radius=0, mask_shrink=0, device=self.device, dtype=self.dtype)
 
         # Embedd the prompt. workflow: prompt -> tokens -> embedding
@@ -40,20 +37,19 @@ class VanillaPipeline():
             (
                 batch_size,
                 self.unet.config.in_channels,
-                self.latent_sample_size, # Height = latent sample size
-                self.latent_sample_size, # Widrh = latent sample size
+                self.latent_sample_size,
+                self.latent_sample_size,
             ),
             device=self.device,
             dtype=self.dtype,
-        ) * self.scheduler.init_noise_sigma # Scale the noisy latent by the scheduler scalar, as it was trained on
+        ) * self.scheduler.init_noise_sigma
 
         self.scheduler.set_timesteps(25)
         guidance_scale = 7 # Control the CFG. Higher values -> higher dependency on the prompt. Values should be around 6-12.
         noise = torch.randn_like(latents)
 
-        # Applying the diffusion iterations.
         for t in self.scheduler.timesteps:
-            latent_model_input = self.scheduler.scale_model_input(latents, t) # Note: scale_model_input actually do nothing with current schedule, but safer. 
+            latent_model_input = self.scheduler.scale_model_input(latents, t)
 
             with torch.no_grad():
                 noise_pred_text = self.unet(
@@ -80,7 +76,6 @@ class VanillaPipeline():
                 t
             )
             
-            # Clamp known region. Note: '*' is elemnent-wise multiplication.
             latents = mask_latent_tensor * latents_original_image_noised + (1 - mask_latent_tensor) * latents
 
         latents = latents / self.vae.config.scaling_factor
@@ -92,7 +87,6 @@ class VanillaPipeline():
         return image
     
 if __name__ == "__main__":
-    # Parse command-line arguments
     parser = argparse.ArgumentParser(description="Run inpainting with specified image number")
     parser.add_argument("--image_num", type=int, default=1, help="Image number to process (default: 1)")
     args = parser.parse_args()
