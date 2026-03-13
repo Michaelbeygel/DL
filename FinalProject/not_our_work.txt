@@ -1,0 +1,3 @@
+compare_results.py
+run_batch_inpainting.py
+pixel_space_loss_inpainting.py
