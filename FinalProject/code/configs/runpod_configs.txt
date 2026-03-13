@@ -1,3 +1,0 @@
-## Run this command everytime you restart RunPod:
-
-pip install transformers diffusers accelerate opencv-python scipy torchmetrics pandas datsets

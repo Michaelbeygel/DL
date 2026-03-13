@@ -10,7 +10,6 @@ import torchvision.transforms as T
 
 # 1. ENVIRONMENT & BUG FIXES
 sys.modules["diffusers.models.attention_dispatch"] = MagicMock()
-os.environ["HF_HOME"] = "/workspace/huggingface_cache"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 from datasets import load_dataset
@@ -51,14 +50,11 @@ def run_integrated_benchmark(num_samples=5):
     eval_v = utils.InpaintingEvaluator(device, dtype)
     
     print("Connecting to PIPE dataset...")
-    cache_dir = "/workspace/huggingface_cache"
-    os.makedirs(cache_dir, exist_ok=True)
     
     dataset = load_dataset(
         "paint-by-inpaint/PIPE", 
         split="test", 
-        streaming=True,
-        cache_dir=cache_dir
+        streaming=True
     )
     
     results = []
@@ -156,5 +152,3 @@ def run_integrated_benchmark(num_samples=5):
 
 if __name__ == "__main__":
     run_integrated_benchmark(750)
-
-# Bug: we load CLIP model every time 

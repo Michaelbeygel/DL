@@ -2,31 +2,29 @@ name: ProjectENV
 channels:
   - pytorch
   - nvidia
-  - defaults
   - conda-forge
+  - defaults
 dependencies:
-  - python
+  - python=3.10
   - pip
   - nodejs
 
   - pandas
   - numpy
   - scipy
-  - jupyter
   - scikit-learn
   - tqdm
-  - torchtext
-  - torchvision
+  - matplotlib
   - jupyterlab
+  - pytest
   - pytest-xdist
   - mkl
-  - ipython
-  - matplotlib
-  - pytest
-  - cudatoolkit
   - pip:
     - datasets
+    - opencv-python
     - huggingface-hub
     - tokenizers
     - safetensors
     - diffusers
+    - transformers
+    - accelerate
