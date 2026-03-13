@@ -1,3 +1,3 @@
-compare_results.py
-run_batch_inpainting.py
-pixel_space_loss_inpainting.py
+code\compare_results.py
+code\run_batch_inpainting.py
+code\pixel_space_loss_inpainting.pya
