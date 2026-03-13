@@ -137,7 +137,6 @@ class LatentLoss(nn.Module):
         original_given_image_latent = original_image_latent * mask
 
         masked_difference_latent = masked_diffusion_latent - original_given_image_latent
-        # Return the (L_2)^2 norm of the difference latent space representations.
         return torch.sum(masked_difference_latent**2)
 
     # Calculated the "Mask edge total variation loss".
@@ -167,7 +166,7 @@ def fill_mask_area(image, mask, tensor_size, blur_radius, device, dtype):
     mask = mask.filter(ImageFilter.GaussianBlur(radius=blur_radius))
     
     img_np = np.array(img).astype(np.float32)
-    mask_np = np.array(mask).astype(np.float32) / 255.0   # normalize to [0,1]
+    mask_np = np.array(mask).astype(np.float32) / 255.0
 
     # Binary mask only for component detection
     mask_bin = mask_np > 0.5
@@ -258,14 +257,11 @@ class InpaintingEvaluator:
         self.device = device
         self.dtype = dtype
         
-        # Standard fidelity metrics
         self.psnr_metric = PeakSignalNoiseRatio(data_range=1.0).to(device)
         self.ssim_metric = StructuralSimilarityIndexMeasure(data_range=1.0).to(device)
         
-        # FID accumulates stats globally across the dataset
         self.fid_metric = FrechetInceptionDistance(feature=2048).to(device)
         
-        # Semantic alignment metric
         self.clip_scorer = CLIPScore(device, dtype) # Uses your existing CLIPScore class
 
     def evaluate_step(self, gen_tensor, tar_tensor, prompt, is_main=True):
@@ -273,23 +269,18 @@ class InpaintingEvaluator:
         Per-sample evaluation.
         gen_tensor/tar_tensor: VAE output range [-1, 1]
         """
-        # Convert to [0, 1] for SSIM and PSNR
         gen_01 = (gen_tensor / 2.0 + 0.5).clamp(0, 1)
         tar_01 = (tar_tensor / 2.0 + 0.5).clamp(0, 1)
         
-        # 1. Structural/Pixel metrics
         ssim_val = self.ssim_metric(gen_01, tar_01).item()
         psnr_val = self.psnr_metric(gen_01, tar_01).item()
         
-        # 2. Semantic alignment
         gen_pil = ToPILImage()(gen_01.squeeze(0).cpu())
         clip_val = self.clip_scorer.CLIP_score(gen_pil, prompt)
         
-        # 3. Update FID State (Expects uint8 [0, 255])
         gen_u8 = (gen_01 * 255).to(torch.uint8)
         tar_u8 = (tar_01 * 255).to(torch.uint8)
         
-        # Only update 'real' distribution once per sample pair
         if is_main:
             self.fid_metric.update(tar_u8, real=True)
         self.fid_metric.update(gen_u8, real=False)
