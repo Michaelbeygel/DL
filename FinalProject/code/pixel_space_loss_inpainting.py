@@ -30,9 +30,9 @@ vae_size = vae.config.sample_size
 
 # 3. Load Data
 # y = A(x0) + n
-y_pixel = utils.image_to_tensor(f"../data/images/image{image_num:02d}.jpg", vae_size, device, dtype)
+y_pixel = utils.image_to_tensor(f"data/images/image{image_num:02d}.jpg", vae_size, device, dtype)
 # The mask: 1.0 for unmasked pixels (keep), 0.0 for pixels to inpaint
-mask = utils.mask_to_tensor(f"../data/masks/mask{image_num:02d}.jpg", vae_size, 0, 0, device, dtype)
+mask = utils.mask_to_tensor(f"data/masks/mask{image_num:02d}.jpg", vae_size, 0, 0, device, dtype)
 
 prompt = utils.get_prompt(image_num)
 text_embeddings = utils.get_text_embeddings(prompt, tokenizer, text_encoder, device)
@@ -105,7 +105,7 @@ with torch.no_grad():
     image_tensor = vae.decode(latents / vae.config.scaling_factor).sample
     final_image = utils.tensor_to_image(image_tensor)
     
-    output_dir = "../data/outputs"
+    output_dir = "data/outputs"
     os.makedirs(output_dir, exist_ok=True)
     save_path = f"{output_dir}/multi_step_dps_image{image_num:02d}.jpg"
     final_image.save(save_path)

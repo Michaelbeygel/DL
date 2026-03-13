@@ -28,12 +28,12 @@ def create_pipeline_components(model_id, device, dtype):
 
 # Returns image, mask and outputs path, based on the image_num and the type of pipeline(Vanilla\Main).
 def get_image_and_mask(image_num, is_vanilla):
-    image_path = f"../data/images/image{image_num:02d}.jpg"
-    mask_path = f"../data/masks/mask{image_num:02d}.jpg"
+    image_path = f"data/images/image{image_num:02d}.jpg"
+    mask_path = f"data/masks/mask{image_num:02d}.jpg"
     if is_vanilla:
-        output_path = f"../data/outputs/vanilla_outputs/inpaint{image_num:02d}.jpg"    
+        output_path = f"data/outputs/vanilla_outputs/inpaint{image_num:02d}.jpg"    
     else:
-        output_path = f"../data/outputs/main_outputs/inpaint{image_num:02d}.jpg"
+        output_path = f"data/outputs/main_outputs/inpaint{image_num:02d}.jpg"
 
     image = Image.open(image_path)
     mask = Image.open(mask_path)
@@ -42,7 +42,7 @@ def get_image_and_mask(image_num, is_vanilla):
 
 # Returns prompt number image_num from promprt.txt file.
 def get_prompt(image_num):
-    prompt_path = "../data/prompts.txt"
+    prompt_path = "data/prompts.txt"
     with open(prompt_path, "r") as f:
         prompt = f.read().splitlines()[image_num - 1]
     return prompt
