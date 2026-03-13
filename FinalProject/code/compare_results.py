@@ -155,6 +155,6 @@ def run_integrated_benchmark(num_samples=5):
         print("\n[!] No samples processed successfully.")
 
 if __name__ == "__main__":
-    run_integrated_benchmark(5)
+    run_integrated_benchmark(750)
 
 # Bug: we load CLIP model every time 
